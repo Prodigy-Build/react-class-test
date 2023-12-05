@@ -1,15 +1,15 @@
-var React = require('react')
-var Link = require('react-router/lib/Link')
-var TimeAgo = require('react-timeago').default
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import TimeAgo from 'react-timeago';
 
-var ItemStore = require('../stores/ItemStore').default
-var SettingsStore = require('../stores/SettingsStore').default
+import ItemStore from '../stores/ItemStore';
+import SettingsStore from '../stores/SettingsStore';
 
-var Spinner = require('../Spinner').default
+import Spinner from '../Spinner';
 
-var pluralise = require('../utils/pluralise').default
+import pluralise from '../utils/pluralise';
 
-var CommentMixin = {
+const CommentMixin = {
   fetchAncestors(comment) {
     ItemStore.fetchCommentAncestors(comment, result => {
       if (process.env.NODE_ENV !== 'production') {
@@ -21,17 +21,16 @@ var CommentMixin = {
           (result.cacheHits / result.itemCount * 100).toFixed(1) + '%)'
         )
       }
-      if (!this.isMounted()) {
+      
+      if (this.isMounted && !this.isMounted()) {
         if (process.env.NODE_ENV !== 'production') {
           console.info("...but the comment isn't mounted")
         }
         // Too late - the comment or the user has moved elsewhere
         return
       }
-      this.setState({
-        parent: result.parent,
-        op: result.op
-      })
+      setParent(result.parent);
+      setOp(result.op);
     })
   },
 
@@ -80,6 +79,9 @@ var CommentMixin = {
    * @param options.childCounts {Object} with .children and .newComments
    */
   renderCommentMeta(comment, options) {
+    const [parent, setParent] = useState(null);
+    const [op, setOp] = useState(null);
+    
     if (comment.dead && !SettingsStore.showDead) {
       return <div className="Comment__meta">
         {options.collapsible && this.renderCollapseControl(options.collapsed)}
@@ -100,9 +102,9 @@ var CommentMixin = {
       {options.link && ' | '}
       {options.link && <Link to={`/comment/${comment.id}`}>link</Link>}
       {options.parent && ' | '}
-      {options.parent && <Link to={`/${this.state.parent.type}/${comment.parent}`}>parent</Link>}
+      {options.parent && <Link to={`/${parent.type}/${comment.parent}`}>parent</Link>}
       {options.op && ' | on: '}
-      {options.op && <Link to={`/${this.state.op.type}/${this.state.op.id}`}>{this.state.op.title}</Link>}
+      {options.op && <Link to={`/${op.type}/${op.id}`}>{op.title}</Link>}
       {comment.dead && ' | [dead]'}
       {options.childCounts && ' | (' + options.childCounts.children + ' child' + pluralise(options.childCounts.children, ',ren')}
       {options.childCounts && options.childCounts.newComments > 0 && ', '}
@@ -121,4 +123,4 @@ var CommentMixin = {
   }
 }
 
-export default CommentMixin
+export default CommentMixin;

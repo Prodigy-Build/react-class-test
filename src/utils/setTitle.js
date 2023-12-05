@@ -1,8 +1,8 @@
-var {SITE_TITLE} = require('./constants').default
+import { SITE_TITLE } from './constants';
 
-function setTitle(title) {
-  if (typeof document === 'undefined') return
-  document.title = (title ? title + ' | ' + SITE_TITLE : SITE_TITLE)
-}
+const setTitle = (title) => {
+  if (typeof document === 'undefined') return;
+  document.title = title ? `${title} | ${SITE_TITLE}` : SITE_TITLE;
+};
 
-export default setTitle
+export default setTitle;
