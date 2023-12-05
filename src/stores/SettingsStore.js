@@ -1,33 +1,30 @@
-var extend = require('../utils/extend').default
-var storage = require('../utils/storage').default
+import { useState, useEffect } from 'react';
+import { get, set } from '../utils/storage';
 
-var STORAGE_KEY = 'settings'
+const STORAGE_KEY = 'settings';
 
-var SettingsStore = {
-  autoCollapse: true,
-  replyLinks: true,
-  showDead: false,
-  showDeleted: false,
-  titleFontSize: 18,
-  listSpacing: 16,
+const useSettings = () => {
+  const [settings, setSettings] = useState({
+    autoCollapse: true,
+    replyLinks: true,
+    showDead: false,
+    showDeleted: false,
+    titleFontSize: 18,
+    listSpacing: 16
+  });
 
-  load() {
-    var json = storage.get(STORAGE_KEY)
+  useEffect(() => {
+    const json = get(STORAGE_KEY);
     if (json) {
-      extend(this, JSON.parse(json))
+      setSettings(JSON.parse(json));
     }
-  },
+  }, []);
 
-  save() {
-    storage.set(STORAGE_KEY, JSON.stringify({
-      autoCollapse: this.autoCollapse,
-      replyLinks: this.replyLinks,
-      showDead: this.showDead,
-      showDeleted: this.showDeleted,
-      titleFontSize: this.titleFontSize,
-      listSpacing: this.listSpacing
-    }))
-  }
-}
+  useEffect(() => {
+    set(STORAGE_KEY, JSON.stringify(settings));
+  }, [settings]);
 
-export default SettingsStore
+  return settings;
+};
+
+export default useSettings;
