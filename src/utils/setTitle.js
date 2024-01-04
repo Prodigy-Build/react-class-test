@@ -1,8 +1,10 @@
-var {SITE_TITLE} = require('./constants').default
+import React, { useEffect } from 'react';
+import { SITE_TITLE } from './constants';
 
-function setTitle(title) {
-  if (typeof document === 'undefined') return
-  document.title = (title ? title + ' | ' + SITE_TITLE : SITE_TITLE)
-}
+const setTitle = (title) => {
+  useEffect(() => {
+    document.title = (title ? title + ' | ' + SITE_TITLE : SITE_TITLE);
+  }, [title]);
+};
 
-export default setTitle
+export default setTitle;

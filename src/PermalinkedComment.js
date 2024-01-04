@@ -1,142 +1,144 @@
-var React = require('react')
-var ReactFireMixin = require('reactfire')
-var withRouter = require('react-router/lib/withRouter')
+import React, { useState, useEffect } from 'react';
+import { withRouter } from 'react-router-dom';
+import CommentThreadStore from './stores/CommentThreadStore';
+import HNService from './services/HNService';
+import SettingsStore from './stores/SettingsStore';
+import UpdatesStore from './stores/UpdatesStore';
+import Comment from './Comment';
+import CommentMixin from './mixins/CommentMixin';
+import cx from './utils/buildClassName';
+import setTitle from './utils/setTitle';
 
-var CommentThreadStore = require('./stores/CommentThreadStore').default
-var HNService = require('./services/HNService').default
-var SettingsStore = require('./stores/SettingsStore').default
-var UpdatesStore = require('./stores/UpdatesStore').default
+const PermalinkedComment = (props) => {
+  const [comment, setComment] = useState({});
+  const [parent, setParent] = useState({ type: 'comment' });
+  const [op, setOp] = useState({});
+  const [threadStore, setThreadStore] = useState(null);
 
-var Comment = require('./Comment').default
-var CommentMixin = require('./mixins/CommentMixin').default
+  const bindComment = () => {
+    HNService.itemRef(props.match.params.id)
+      .then((ref) => {
+        ref.on('value', (snapshot) => {
+          const commentData = snapshot.val();
+          setComment(commentData || {});
+        })
+      })
+  };
 
-var cx = require('./utils/buildClassName').default
-var setTitle = require('./utils/setTitle').default
+  const unbindComment = () => {
+    HNService.itemRef(props.match.params.id)
+      .then((ref) => {
+        ref.off('value');
+      });
+  };
 
-var PermalinkedComment = React.createClass({
-  mixins: [CommentMixin, ReactFireMixin],
-
-  getDefaultProps() {
-    return {
-      level: 0,
-      loadingSpinner: true
+  useEffect(() => {
+    if (comment.id) {
+      bindComment();
     }
-  },
+    return unbindComment();
+  }, [props.match.params.id]);
 
-  getInitialState() {
-    return {
-      comment: UpdatesStore.getComment(this.props.params.id) || {},
-      parent: {type: 'comment'},
-      op: {}
+  useEffect(() => {
+    const comment = UpdatesStore.getComment(props.match.params.id);
+    if (comment) {
+      commentLoaded(comment);
+      setComment(comment);
     }
-  },
+    unbindComment();
+    bindComment();
+  }, [props.match.params.id]);
 
-  componentWillMount() {
-    this.bindAsObject(HNService.itemRef(this.props.params.id), 'comment')
-    if (this.state.comment.id) {
-      this.commentLoaded(this.state.comment)
-    }
-  },
-
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.params.id !== this.props.params.id) {
-      var comment = UpdatesStore.getComment(nextProps.params.id)
-      if (comment) {
-        this.commentLoaded(comment)
-        this.setState({comment: comment})
+  useEffect(() => {
+    if (comment && comment.id) {
+      if (!comment.deleted && comment.type !== 'comment') {
+        props.history.replace(`/${comment.type}/${comment.id}`);
       }
-      this.unbind('comment')
-      this.bindAsObject(HNService.itemRef(nextProps.params.id), 'comment')
-    }
-  },
-
-  componentWillUpdate(nextProps, nextState) {
-    if (!nextState.comment) {
-      return
-    }
-
-    if (this.state.comment.id !== nextState.comment.id) {
-      if (!nextState.comment.deleted) {
-        // Redirect to the appropriate route if a Comment "parent" link had a
-        // non-comment item id.
-        if (nextState.comment.type !== 'comment') {
-          this.props.router.replace(`/${nextState.comment.type}/${nextState.comment.id}`)
-          return
-        }
-      }
-      if (!this.threadStore || this.threadStore.itemId !== nextState.comment.id) {
-        this.commentLoaded(nextState.comment)
+      if (!threadStore || threadStore.itemId !== comment.id) {
+        commentLoaded(comment);
       }
     }
-  },
+  }, [comment]);
 
-  commentLoaded(comment) {
-    this.setTitle(comment)
+  const commentLoaded = (comment) => {
+    setTitle(comment);
     if (!comment.deleted) {
-      this.threadStore = new CommentThreadStore(comment, this.handleCommentsChanged)
-      this.fetchAncestors(comment)
+      setThreadStore(new CommentThreadStore(comment, handleCommentsChanged));
+      fetchAncestors(comment);
     }
-  },
+  };
 
-  setTitle(comment) {
+  const setTitle = (comment) => {
     if (comment.deleted) {
-      return setTitle('Deleted comment')
+      return setTitle('Deleted comment');
     }
-    var title = 'Comment by ' + comment.by
-    if (this.state.op.id) {
-      title += ' | ' + this.state.op.title
+    let title = 'Comment by ' + comment.by;
+    if (op.id) {
+      title += ' | ' + op.title;
     }
-    setTitle(title)
-  },
+    setTitle(title);
+  };
 
-  handleCommentsChanged(payload) {
-    // We're only interested in re-rendering to update collapsed display
+  const handleCommentsChanged = (payload) => {
     if (payload.type === 'collapse') {
-      this.forceUpdate()
+      forceUpdate();
     }
-  },
+  };
 
-  render() {
-    var comment = this.state.comment
-    if (!comment) {
-      return this.renderError(comment, {
-        id: this.props.params.id,
-        className: 'Comment Comment--level0 Comment--error'
-      })
-    }
-    // Render a placeholder while we're waiting for the comment to load
-    if (!comment.id) { return this.renderCommentLoading(comment) }
-    // Render a link to HN for deleted comments
-    if (comment.deleted) {
-      return this.renderCommentDeleted(comment, {
-        className: 'Comment Comment--level0 Comment--deleted'
-      })
-    }
-    // XXX Don't render anything if we're replacing the route after loading a non-comment
-    if (comment.type !== 'comment') { return null }
+  const renderError = (comment, options) => {
+    return (
+      <div className={options.className}>
+        Error fetching comment {options.id}
+      </div>
+    );
+  };
 
-    var className = cx('PermalinkedComment Comment Comment--level0', {'Comment--dead': comment.dead})
-    var threadStore = this.threadStore
+  const renderCommentLoading = (comment) => {
+    return (
+      <div className={cx('Comment Comment--level0', { 'Comment--loading': true })}>
+        Loading comment...
+      </div>
+    );
+  };
 
-    return <div className={className}>
+  const renderCommentDeleted = (comment, options) => {
+    return (
+      <div className={options.className}>
+        Comment deleted
+      </div>
+    );
+  };
+
+  const renderCommentMeta = (comment, options) => {
+    // implement renderCommentMeta logic
+  };
+
+  const renderCommentText = (comment, options) => {
+    // implement renderCommentText logic
+  };
+
+  return (
+    <div className={cx('PermalinkedComment Comment Comment--level0', { 'Comment--dead': comment.dead })}>
       <div className="Comment__content">
-        {this.renderCommentMeta(comment, {
-          parent: !!this.state.parent.id && !!this.state.op.id && comment.parent !== this.state.op.id,
-          op: !!this.state.op.id
+        {renderCommentMeta(comment, {
+          parent: !!parent.id && !!op.id && comment.parent !== op.id,
+          op: !!op.id
         })}
-        {(!comment.dead || SettingsStore.showDead) && this.renderCommentText(comment, {replyLink: true})}
+        {(!comment.dead || SettingsStore.showDead) && renderCommentText(comment, { replyLink: true })}
       </div>
       {comment.kids && <div className="Comment__kids">
-        {comment.kids.map(function(id, index) {
-          return <Comment key={id} id={id}
+        {comment.kids.map(function (id, index) {
+          return <Comment
+            key={id}
+            id={id}
             level={0}
             loadingSpinner={index === 0}
             threadStore={threadStore}
-          />
+          />;
         })}
       </div>}
     </div>
-  }
-})
+  );
+};
 
-export default withRouter(PermalinkedComment)
+export default withRouter(PermalinkedComment);

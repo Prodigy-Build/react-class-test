@@ -1,10 +1,11 @@
-var PageNumberMixin = {
-  getPageNumber(page) {
-    if (typeof page == 'undefined') {
-      page = this.props.location.query.page
-    }
-    return (page && /^\d+$/.test(page) ? Math.max(1, Number(page)) : 1)
-  }
-}
+import { useLocation } from 'react-router-dom';
 
-export default PageNumberMixin
+const getPageNumber = (page) => {
+  const location = useLocation();
+  if (typeof page === 'undefined') {
+    page = new URLSearchParams(location.search).get('page');
+  }
+  return (page && /^\d+$/.test(page) ? Math.max(1, Number(page)) : 1);
+};
+
+export default getPageNumber;

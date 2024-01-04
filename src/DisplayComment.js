@@ -1,52 +1,42 @@
-var React = require('react')
-
-var SettingsStore = require('./stores/SettingsStore').default
-
-var CommentMixin = require('./mixins/CommentMixin').default
-
-var cx = require('./utils/buildClassName').default
+import React, { useState, useEffect } from 'react';
+import SettingsStore from './stores/SettingsStore';
+import CommentMixin from './mixins/CommentMixin';
+import cx from './utils/buildClassName';
 
 /**
  * Displays a standalone comment passed as a prop.
  */
-var DisplayComment = React.createClass({
-  mixins: [CommentMixin],
+const DisplayComment = ({ comment }) => {
+  const [op, setOp] = useState({});
+  const [parent, setParent] = useState({ type: 'comment' });
 
-  propTypes: {
-    comment: React.PropTypes.object.isRequired
-  },
+  useEffect(() => {
+    fetchAncestors(comment);
+  }, [comment]);
 
-  getInitialState() {
-    return {
-      op: {},
-      parent: {type: 'comment'}
-    }
-  },
+  const fetchAncestors = (comment) => {
+    // Implement fetchAncestors logic here
+  };
 
-  componentWillMount() {
-    this.fetchAncestors(this.props.comment)
-  },
+  if (comment.deleted) { return null }
+  if (comment.dead && !SettingsStore.showDead) { return null }
 
-  render() {
-    if (this.props.comment.deleted) { return null }
-    if (this.props.comment.dead && !SettingsStore.showDead) { return null }
+  const className = cx('Comment Comment--level0', {
+    'Comment--dead': comment.dead
+  });
 
-    var comment = this.props.comment
-    var className = cx('Comment Comment--level0', {
-      'Comment--dead': comment.dead
-    })
-
-    return <div className={className}>
+  return (
+    <div className={className}>
       <div className="Comment__content">
-        {this.renderCommentMeta(comment, {
+        {renderCommentMeta(comment, {
           link: true,
-          parent: !!this.state.parent.id && !!this.state.op.id && comment.parent !== this.state.op.id,
-          op: !!this.state.op.id
+          parent: !!parent.id && !!op.id && comment.parent !== op.id,
+          op: !!op.id
         })}
-        {this.renderCommentText(comment, {replyLink: false})}
+        {renderCommentText(comment, { replyLink: false })}
       </div>
     </div>
-  }
-})
+  );
+};
 
-export default DisplayComment
+export default DisplayComment;

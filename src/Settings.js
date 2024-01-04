@@ -1,31 +1,32 @@
-var React = require('react')
+import React, { useEffect, useRef } from 'react';
+import SettingsStore from './stores/SettingsStore';
 
-var SettingsStore = require('./stores/SettingsStore').default
+function Settings() {
+  const containerRef = useRef(null);
+  
+  useEffect(() => {
+    containerRef.current.focus();
+  }, []);
 
-var Settings = React.createClass({
-  componentDidMount() {
-    this.refs.container.focus()
-  },
-
-  onChange(e) {
-    var el = e.target
+  const onChange = (e) => {
+    var el = e.target;
     if (el.type === 'checkbox') {
-      SettingsStore[el.name] = el.checked
+      SettingsStore[el.name] = el.checked;
     }
     else if (el.type === 'number' && el.value) {
-      SettingsStore[el.name] = el.value
+      SettingsStore[el.name] = el.value;
     }
-    this.forceUpdate()
-    SettingsStore.save()
-  },
+    SettingsStore.save();
+    // No need to forceUpdate() in functional component
+  };
 
-  onClick(e) {
-    e.stopPropagation()
-  },
+  const onClick = (e) => {
+    e.stopPropagation();
+  };
 
-  render() {
-    return <div ref="container" className="Settings" tabIndex="-1" onClick={this.onClick}>
-      <form onChange={this.onChange}>
+  return (
+    <div ref={containerRef} className="Settings" tabIndex="-1" onClick={onClick}>
+      <form onChange={onChange}>
         <div className="Settings__setting Settings__setting--checkbox">
           <label htmlFor="autoCollapse">
             <input type="checkbox" name="autoCollapse" id="autoCollapse" checked={SettingsStore.autoCollapse}/> auto collapse
@@ -66,7 +67,7 @@ var Settings = React.createClass({
         </div>
       </form>
     </div>
-  }
-})
+  );
+}
 
-export default Settings
+export default Settings;

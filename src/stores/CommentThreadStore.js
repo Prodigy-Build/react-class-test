@@ -1,109 +1,118 @@
-var extend = require('../utils/extend').default
+const extend = require('../utils/extend').default;
 
 function CommentThreadStore(item, onCommentsChanged) {
-  this.itemId = item.id
-  this.onCommentsChanged = onCommentsChanged
+  const itemId = item.id;
+  const [comments, setComments] = useState({});
+  const [children, setChildren] = useState({[item.id]: []});
+  const [isNew, setIsNew] = useState({});
+  const [isCollapsed, setIsCollapsed] = useState({});
+  const [deadComments, setDeadComments] = useState({});
 
-  /**
-   * Lookup from a comment id to the comment.
-   * @type {Object.<id,Comment>}
-   */
-  this.comments = {}
-
-  /**
-   * Lookup from a comment id to its child comment ids.
-   * @type {Object.<id,Array.<Number>>}
-   */
-  this.children = {}
-  this.children[item.id] = []
-
-  /**
-   * Lookup for new comment ids. Will only contain true.
-   * @type {Object.<id,Boolean>}
-   */
-  this.isNew = {}
-
-  /**
-   * Lookup for collapsed state of comment ids. May contain true or false.
-   * @type {Object.<id,Boolean>}
-   */
-  this.isCollapsed = {}
-
-  /**
-   * Lookup for dead comment ids
-   * @type {Object.<id,Boolean>}
-   */
-  this.deadComments = {}
-}
-
-extend(CommentThreadStore.prototype, {
-  /**
-   * Get counts of children and new comments under the given comment.
-   * @return .children {Number}
-   * @return .newComments {Number}
-   */
-  getChildCounts(comment) {
-    var childCount = 0
-    var newCommentCount = 0
-    var nodes = [comment.id]
+  const getChildCounts = (comment) => {
+    let childCount = 0;
+    let newCommentCount = 0;
+    let nodes = [comment.id];
 
     while (nodes.length) {
-      var nextNodes = []
-      for (var i = 0, l = nodes.length; i < l; i++) {
-        var nodeChildren = this.children[nodes[i]]
+      let nextNodes = [];
+      for (let i = 0, l = nodes.length; i < l; i++) {
+        const nodeChildren = children[nodes[i]];
         if (nodeChildren.length) {
-          nextNodes.push.apply(nextNodes, nodeChildren)
+          nextNodes.push(...nodeChildren);
         }
       }
-      for (i = 0, l = nextNodes.length; i < l; i++) {
-        if (this.isNew[nextNodes[i]]) {
-          newCommentCount++
+      for (let i = 0, l = nextNodes.length; i < l; i++) {
+        if (isNew[nextNodes[i]]) {
+          newCommentCount++;
         }
       }
-      childCount += nextNodes.length
-      nodes = nextNodes
+      childCount += nextNodes.length;
+      nodes = nextNodes;
     }
 
     return {
       children: childCount,
       newComments: newCommentCount
+    };
+  };
+
+  const commentAdded = (comment) => {
+    if (comment.deleted) {
+      return;
     }
-  },
 
-  /**
-   * Register a comment's appearance in the thread.
-   */
-  commentAdded(comment) {
-    if (comment.deleted) { return }
+    setComments((prevComments) => ({
+      ...prevComments,
+      [comment.id]: comment
+    }));
 
-    this.comments[comment.id] = comment
-    this.children[comment.id] = []
-    this.children[comment.parent].push(comment.id)
+    setChildren((prevChildren) => ({
+      ...prevChildren,
+      [comment.id]: []
+    }));
+
+    setChildren((prevChildren) => ({
+      ...prevChildren,
+      [comment.parent]: [...prevChildren[comment.parent], comment.id]
+    }));
+
     if (comment.dead) {
-      this.deadComments[comment.id] = true
+      setDeadComments((prevDeadComments) => ({
+        ...prevDeadComments,
+        [comment.id]: true
+      }));
     }
-  },
+  };
 
-  /**
-   * Register a comment's deletion from the thread.
-   */
-  commentDeleted(comment) {
-    // Comments which initially failed to load (null from Firebase API) can be
-    // deleted by the time the API catches up.
-    if (!comment) { return }
+  const commentDeleted = (comment) => {
+    if (!comment) {
+      return;
+    }
 
-    delete this.comments[comment.id]
-    var siblings = this.children[comment.parent]
-    siblings.splice(siblings.indexOf(comment.id), 1)
+    setComments((prevComments) => {
+      const updatedComments = { ...prevComments };
+      delete updatedComments[comment.id];
+      return updatedComments;
+    });
+
+    setChildren((prevChildren) => {
+      const updatedChildren = { ...prevChildren };
+      const siblings = updatedChildren[comment.parent];
+      const index = siblings.indexOf(comment.id);
+      siblings.splice(index, 1);
+      return updatedChildren;
+    });
+
     if (comment.dead) {
-      delete this.deadComments[comment.id]
+      setDeadComments((prevDeadComments) => {
+        const updatedDeadComments = { ...prevDeadComments };
+        delete updatedDeadComments[comment.id];
+        return updatedDeadComments;
+      });
     }
-  },
+  };
 
-  toggleCollapse(commentId) {
-    this.isCollapsed[commentId] = !this.isCollapsed[commentId]
-    this.onCommentsChanged({type: 'collapse'})
-  }
-})
+  const toggleCollapse = (commentId) => {
+    setIsCollapsed((prevIsCollapsed) => ({
+      ...prevIsCollapsed,
+      [commentId]: !prevIsCollapsed[commentId]
+    }));
 
-export default CommentThreadStore
+    onCommentsChanged({ type: 'collapse' });
+  };
+
+  return {
+    itemId,
+    comments,
+    children,
+    isNew,
+    isCollapsed,
+    deadComments,
+    getChildCounts,
+    commentAdded,
+    commentDeleted,
+    toggleCollapse
+  };
+}
+
+export default CommentThreadStore;

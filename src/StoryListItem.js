@@ -1,14 +1,14 @@
-var React = require('react')
-var ReactFireMixin = require('reactfire')
+import React, { useState, useEffect } from 'react';
+import { useReactFire } from 'reactfire';
 
-var StoryCommentThreadStore = require('./stores/StoryCommentThreadStore').default
-var HNService = require('./services/HNService').default
-var SettingsStore = require('./stores/SettingsStore').default
-var StoryStore = require('./stores/StoryStore').default
+import StoryCommentThreadStore from './stores/StoryCommentThreadStore';
+import HNService from './services/HNService';
+import SettingsStore from './stores/SettingsStore';
+import StoryStore from './stores/StoryStore';
 
-var ItemMixin = require('./mixins/ItemMixin').default
-var ListItemMixin = require('./mixins/ListItemMixin').default
-var Spinner = require('./Spinner').default
+import ItemMixin from './mixins/ItemMixin';
+import ListItemMixin from './mixins/ListItemMixin';
+import Spinner from './Spinner';
 
 /**
  * Display story title and metadata as as a list item.
@@ -16,110 +16,52 @@ var Spinner = require('./Spinner').default
  * responsible for listening to updates to the story and providing the latest
  * version for StoryStore's cache.
  */
-var StoryListItem = React.createClass({
-  mixins: [ItemMixin, ListItemMixin, ReactFireMixin],
+const StoryListItem = (props) => {
+  const [item, setItem] = useState(props.cachedItem || {});
+  const [threadState, setThreadState] = useState(null);
+  const [store] = useState(props.store);
 
-  propTypes: {
-    // The StoryStore handling caching and updates to the stories being displayed
-    store: React.PropTypes.instanceOf(StoryStore).isRequired,
-
-    // The story's id in Hacker News
-    id: React.PropTypes.number,
-    // A version of the story from the cache, for initial display
-    cachedItem: React.PropTypes.object,
-    // The current index of the story in the list being displayed
-    index: React.PropTypes.number
-  },
-
-  getDefaultProps() {
-    return {
-      id: null,
-      cachedItem: null,
-      index: null
+  useReactFire(() => {
+    if (props.id != null) {
+      initLiveItem(props);
+    } else if (props.cachedItem != null) {
+      setThreadState(StoryCommentThreadStore.loadState(item.id));
     }
-  },
+  });
 
-  getInitialState() {
-    return {
-      item: this.props.cachedItem || {}
-    }
-  },
-
-  componentWillMount() {
-    if (this.props.id != null) {
-      this.initLiveItem(this.props)
-    }
-    else if (this.props.cachedItem != null) {
-      // Display the comment state of the cached item we were given while we're
-      // waiting for the live item to load.
-      this.threadState = StoryCommentThreadStore.loadState(this.state.item.id)
-    }
-  },
-
-  componentWillUnmount() {
-    if (this.props.id != null) {
-      this.props.store.removeListener(this.props.id, this.updateThreadState)
-    }
-  },
-
-  /**
-   * Catch the transition from not having an id prop to having one.
-   * Scenario: we were waiting for the initial list of story ids to load.
-   */
-  componentWillReceiveProps(nextProps) {
-    if (this.props.id == null && nextProps.id != null) {
-      this.initLiveItem(nextProps)
-    }
-  },
-
-  /**
-   * If the live item has been loaded or updated, update the StoryStore cache
-   * with its current index and latest data.
-   */
-  componentWillUpdate(nextProps, nextState) {
-    if (this.state.item !== nextState.item) {
-      if (nextState.item != null) {
-        this.props.store.itemUpdated(nextState.item, this.props.index)
-      }
-      else {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(`Item ${this.props.id} went from ${JSON.stringify(this.state.item)} to ${nextProps.item}`)
-        }
+  useEffect(() => {
+    return () => {
+      if (props.id != null) {
+        store.removeListener(props.id, updateThreadState);
       }
     }
-  },
+  }, []);
 
-  /**
-   * Initialise listening to updates for the item with the given id and
-   * initialise its comment thread state.
-   */
-  initLiveItem(props) {
-    // If we were given a cached item to display initially, it will be replaced
-    this.bindAsObject(HNService.itemRef(props.id), 'item')
+  const initLiveItem = (props) => {
+    setItem(props.cachedItem || {});
+    setThreadState(null);
 
-    this.threadState = StoryCommentThreadStore.loadState(props.id)
-    this.props.store.addListener(props.id, this.updateThreadState)
-  },
+    bindAsObject(HNService.itemRef(props.id), 'item');
 
-  /**
-   * Update thread state in response to a storage event indicating it has been
-   * modified.
-   */
-  updateThreadState() {
-    this.threadState = StoryCommentThreadStore.loadState(this.props.id)
-    this.forceUpdate()
-  },
+    setThreadState(StoryCommentThreadStore.loadState(props.id));
+    store.addListener(props.id, updateThreadState);
+  };
 
-  render() {
-    // Display the loading spinner if we have nothing to show initially
-    if (!this.state.item || !this.state.item.id) {
-      return <li className="ListItem ListItem--loading" style={{marginBottom: SettingsStore.listSpacing}}>
-        <Spinner/>
+  const updateThreadState = () => {
+    setThreadState(StoryCommentThreadStore.loadState(props.id));
+    forceUpdate();
+  };
+
+  // Display the loading spinner if we have nothing to show initially
+  if (!item || !item.id) {
+    return (
+      <li className="ListItem ListItem--loading" style={{ marginBottom: SettingsStore.listSpacing }}>
+        <Spinner />
       </li>
-    }
-
-    return this.renderListItem(this.state.item, this.threadState)
+    );
   }
-})
 
-export default StoryListItem
+  return this.renderListItem(item, threadState);
+}
+
+export default StoryListItem;

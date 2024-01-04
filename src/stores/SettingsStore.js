@@ -1,33 +1,54 @@
-var extend = require('../utils/extend').default
-var storage = require('../utils/storage').default
+import { useState, useEffect } from 'react';
+import { get, set } from '../utils/storage';
 
-var STORAGE_KEY = 'settings'
+const STORAGE_KEY = 'settings';
 
-var SettingsStore = {
-  autoCollapse: true,
-  replyLinks: true,
-  showDead: false,
-  showDeleted: false,
-  titleFontSize: 18,
-  listSpacing: 16,
+const SettingsStore = () => {
+  const [autoCollapse, setAutoCollapse] = useState(true);
+  const [replyLinks, setReplyLinks] = useState(true);
+  const [showDead, setShowDead] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [titleFontSize, setTitleFontSize] = useState(18);
+  const [listSpacing, setListSpacing] = useState(16);
 
-  load() {
-    var json = storage.get(STORAGE_KEY)
+  useEffect(() => {
+    const json = get(STORAGE_KEY);
     if (json) {
-      extend(this, JSON.parse(json))
+      const data = JSON.parse(json);
+      setAutoCollapse(data.autoCollapse);
+      setReplyLinks(data.replyLinks);
+      setShowDead(data.showDead);
+      setShowDeleted(data.showDeleted);
+      setTitleFontSize(data.titleFontSize);
+      setListSpacing(data.listSpacing);
     }
-  },
+  }, []);
 
-  save() {
-    storage.set(STORAGE_KEY, JSON.stringify({
-      autoCollapse: this.autoCollapse,
-      replyLinks: this.replyLinks,
-      showDead: this.showDead,
-      showDeleted: this.showDeleted,
-      titleFontSize: this.titleFontSize,
-      listSpacing: this.listSpacing
-    }))
-  }
-}
+  useEffect(() => {
+    set(STORAGE_KEY, JSON.stringify({
+      autoCollapse,
+      replyLinks,
+      showDead,
+      showDeleted,
+      titleFontSize,
+      listSpacing
+    }));
+  }, [autoCollapse, replyLinks, showDead, showDeleted, titleFontSize, listSpacing]);
 
-export default SettingsStore
+  return {
+    autoCollapse,
+    setAutoCollapse,
+    replyLinks,
+    setReplyLinks,
+    showDead,
+    setShowDead,
+    showDeleted,
+    setShowDeleted,
+    titleFontSize,
+    setTitleFontSize,
+    listSpacing,
+    setListSpacing
+  };
+};
+
+export default SettingsStore;
