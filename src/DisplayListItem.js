@@ -1,28 +1,17 @@
-var React = require('react')
+import React, { useEffect, useState } from 'react';
 
-var StoryCommentThreadStore = require('./stores/StoryCommentThreadStore').default
+import { loadState } from './stores/StoryCommentThreadStore'; // assuming loadState is a named export
 
-var ItemMixin = require('./mixins/ItemMixin').default
-var ListItemMixin = require('./mixins/ListItemMixin').default
+import { renderListItem } from './mixins/ListItemMixin'; // assuming renderListItem is a named export
 
-/**
- * Display story title and metadata as a list item.
- * The story to display will be passed as a prop.
- */
-var DisplayListItem = React.createClass({
-  mixins: [ItemMixin, ListItemMixin],
+const DisplayListItem = ({ item }) => {
+  const [threadState, setThreadState] = useState({});
 
-  propTypes: {
-    item: React.PropTypes.object.isRequired
-  },
+  useEffect(() => {
+    setThreadState(loadState(item.id));
+  }, [item.id]);
 
-  componentWillMount() {
-    this.threadState = StoryCommentThreadStore.loadState(this.props.item.id)
-  },
+  return renderListItem(item, threadState);
+};
 
-  render() {
-    return this.renderListItem(this.props.item, this.threadState)
-  }
-})
-
-export default DisplayListItem
+export default DisplayListItem;

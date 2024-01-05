@@ -1,96 +1,91 @@
-var HNService = require('../services/HNService').default
+import { useState } from 'react';
+import HNService from '../services/HNService';
 
-var StoryStore = require('./StoryStore').default
-var UpdatesStore = require('./UpdatesStore').default
-var commentParentLookup = {}
-var titleCache = {}
+const commentParentLookup = {};
+const titleCache = {};
 
-function fetchCommentParent(comment, cb, result) {
-  var commentId = comment.id
-  var parentId = comment.parent
+const fetchCommentParent = (comment, cb, result) => {
+  const [commentId, setCommentId] = useState(comment.id);
+  const [parentId, setParentId] = useState(comment.parent);
 
   while (commentParentLookup[parentId] || titleCache[parentId]) {
-    // We just saved ourselves an item fetch
-    result.itemCount++
-    result.cacheHits++
+    result.itemCount++;
+    result.cacheHits++;
 
-    // The parent is a known non-comment
     if (titleCache[parentId]) {
-      if (result.itemCount === 1) { result.parent = titleCache[parentId] }
-      result.op = titleCache[parentId]
-      cb(result)
-      return
+      if (result.itemCount === 1) {
+        result.parent = titleCache[parentId];
+      }
+      result.op = titleCache[parentId];
+      cb(result);
+      return;
     }
 
-    // The parent is a known comment
     if (commentParentLookup[parentId]) {
-      if (result.itemCount === 1) { result.parent = {id: parentId, type: 'comment'} }
-      // Set the parent comment's ids up for the next iteration
-      commentId = parentId
-      parentId = commentParentLookup[parentId]
+      if (result.itemCount === 1) {
+        result.parent = { id: parentId, type: 'comment' };
+      }
+      setCommentId(parentId);
+      setParentId(commentParentLookup[parentId]);
     }
   }
 
-  // The parent of the current comment isn't known, so we'll have to fetch it
-  ItemStore.getItem(parentId, function(parent) {
-    result.itemCount++
-    // Add the current comment's parent to the lookup for next time
-    commentParentLookup[commentId] = parentId
+  ItemStore.getItem(parentId, (parent) => {
+    result.itemCount++;
+    commentParentLookup[commentId] = parentId;
     if (parent.type === 'comment') {
-      commentParentLookup[parent.id] = parent.parent
+      commentParentLookup[parent.id] = parent.parent;
     }
-    processCommentParent(parent, cb, result)
-  }, result)
-}
+    processCommentParent(parent, cb, result);
+  }, result);
+};
 
-function processCommentParent(item, cb, result) {
+const processCommentParent = (item, cb, result) => {
   if (result.itemCount === 1) {
-    result.parent = item
+    result.parent = item;
   }
   if (item.type !== 'comment') {
-    result.op = item
+    result.op = item;
     titleCache[item.id] = {
       id: item.id,
       type: item.type,
       title: item.title
-    }
-    cb(result)
+    };
+    cb(result);
+  } else {
+    fetchCommentParent(item, cb, result);
   }
-  else {
-    fetchCommentParent(item, cb, result)
-  }
-}
+};
 
-var ItemStore = {
+const ItemStore = {
   getItem(id, cb, result) {
-    var cachedItem = this.getCachedItem(id)
+    const cachedItem = this.getCachedItem(id);
     if (cachedItem) {
       if (result) {
-        result.cacheHits++
+        result.cacheHits++;
       }
-      setImmediate(cb, cachedItem)
-    }
-    else {
-      HNService.fetchItem(id, cb)
+      setTimeout(() => cb(cachedItem), 0);
+    } else {
+      HNService.fetchItem(id, cb);
     }
   },
 
   getCachedItem(id) {
-    return StoryStore.getItem(id) || UpdatesStore.getItem(id) || null
+    return StoryStore.getItem(id) || UpdatesStore.getItem(id) || null;
   },
 
   getCachedStory(id) {
-    return StoryStore.getItem(id) || UpdatesStore.getStory(id) || null
+    return StoryStore.getItem(id) || UpdatesStore.getStory(id) || null;
   },
 
   fetchCommentAncestors(comment, cb) {
-    var startTime = Date.now()
-    var result = {itemCount: 0, cacheHits: 0}
-    fetchCommentParent(comment, function() {
-      result.timeTaken = Date.now() - startTime
-      setImmediate(cb, result)
-    }, result)
+    const startTime = Date.now();
+    const result = { itemCount: 0, cacheHits: 0 };
+    fetchCommentParent(comment, () => {
+      result.timeTaken = Date.now() - startTime;
+      setTimeout(() => cb(result), 0);
+    }, result);
   }
-}
+};
 
-export default ItemStore
+export default ItemStore;

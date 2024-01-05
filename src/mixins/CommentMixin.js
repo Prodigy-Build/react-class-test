@@ -1,15 +1,12 @@
-var React = require('react')
-var Link = require('react-router/lib/Link')
-var TimeAgo = require('react-timeago').default
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import TimeAgo from 'react-timeago';
+import ItemStore from '../stores/ItemStore';
+import SettingsStore from '../stores/SettingsStore';
+import Spinner from '../Spinner';
+import pluralise from '../utils/pluralise';
 
-var ItemStore = require('../stores/ItemStore').default
-var SettingsStore = require('../stores/SettingsStore').default
-
-var Spinner = require('../Spinner').default
-
-var pluralise = require('../utils/pluralise').default
-
-var CommentMixin = {
+const CommentMixin = {
   fetchAncestors(comment) {
     ItemStore.fetchCommentAncestors(comment, result => {
       if (process.env.NODE_ENV !== 'production') {
@@ -121,4 +118,4 @@ var CommentMixin = {
   }
 }
 
-export default CommentMixin
+export default CommentMixin;

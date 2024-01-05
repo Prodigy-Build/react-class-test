@@ -1,52 +1,52 @@
-var React = require('react')
+import React, { useEffect, useRef } from 'react';
 
-var SettingsStore = require('./stores/SettingsStore').default
+import SettingsStore from './stores/SettingsStore';
 
-var Settings = React.createClass({
-  componentDidMount() {
-    this.refs.container.focus()
-  },
+const Settings = () => {
+  const containerRef = useRef(null);
 
-  onChange(e) {
-    var el = e.target
+  useEffect(() => {
+    containerRef.current.focus();
+  }, []);
+
+  const onChange = (e) => {
+    const el = e.target;
     if (el.type === 'checkbox') {
-      SettingsStore[el.name] = el.checked
+      SettingsStore[el.name] = el.checked;
+    } else if (el.type === 'number' && el.value) {
+      SettingsStore[el.name] = el.value;
     }
-    else if (el.type === 'number' && el.value) {
-      SettingsStore[el.name] = el.value
-    }
-    this.forceUpdate()
-    SettingsStore.save()
-  },
+    SettingsStore.save();
+  };
 
-  onClick(e) {
-    e.stopPropagation()
-  },
+  const onClick = (e) => {
+    e.stopPropagation();
+  };
 
-  render() {
-    return <div ref="container" className="Settings" tabIndex="-1" onClick={this.onClick}>
-      <form onChange={this.onChange}>
+  return (
+    <div ref={containerRef} className="Settings" tabIndex="-1" onClick={onClick}>
+      <form onChange={onChange}>
         <div className="Settings__setting Settings__setting--checkbox">
           <label htmlFor="autoCollapse">
-            <input type="checkbox" name="autoCollapse" id="autoCollapse" checked={SettingsStore.autoCollapse}/> auto collapse
+            <input type="checkbox" name="autoCollapse" id="autoCollapse" checked={SettingsStore.autoCollapse} /> auto collapse
           </label>
           <p>Automatically collapse comment threads without new comments on page load.</p>
         </div>
         <div className="Settings__setting Settings__setting--checkbox">
           <label htmlFor="replyLinks">
-            <input type="checkbox" name="replyLinks" id="replyLinks" checked={SettingsStore.replyLinks}/> show reply links
+            <input type="checkbox" name="replyLinks" id="replyLinks" checked={SettingsStore.replyLinks} /> show reply links
           </label>
           <p>Show "reply" links to Hacker News</p>
         </div>
         <div className="Settings__setting Settings__setting--checkbox">
           <label htmlFor="showDead">
-            <input type="checkbox" name="showDead" id="showDead" checked={SettingsStore.showDead}/> show dead
+            <input type="checkbox" name="showDead" id="showDead" checked={SettingsStore.showDead} /> show dead
           </label>
           <p>Show items flagged as dead.</p>
         </div>
         <div className="Settings__setting Settings__setting--checkbox">
           <label htmlFor="showDeleted">
-            <input type="checkbox" name="showDeleted" id="showDeleted" checked={SettingsStore.showDeleted}/> show deleted
+            <input type="checkbox" name="showDeleted" id="showDeleted" checked={SettingsStore.showDeleted} /> show deleted
           </label>
           <p>Show comments flagged as deleted in threads.</p>
         </div>
@@ -55,18 +55,18 @@ var Settings = React.createClass({
             <tbody>
               <tr>
                 <td><label htmlFor="titleFontSize">title font size:</label></td>
-                <td><input type="number" min="14" step="1" name="titleFontSize" id="titleFontSize" value={SettingsStore.titleFontSize}/></td>
+                <td><input type="number" min="14" step="1" name="titleFontSize" id="titleFontSize" value={SettingsStore.titleFontSize} /></td>
               </tr>
               <tr>
                 <td><label htmlFor="listSpacing">list spacing:</label></td>
-                <td><input type="number" min="0" name="listSpacing" id="listSpacing" value={SettingsStore.listSpacing}/></td>
+                <td><input type="number" min="0" name="listSpacing" id="listSpacing" value={SettingsStore.listSpacing} /></td>
               </tr>
             </tbody>
           </table>
         </div>
       </form>
     </div>
-  }
-})
+  );
+};
 
-export default Settings
+export default Settings;

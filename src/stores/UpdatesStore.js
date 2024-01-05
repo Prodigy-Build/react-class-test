@@ -1,9 +1,7 @@
-var EventEmitter = require('events').EventEmitter
-
-var HNService = require('../services/HNService').default
-
-var {UPDATES_CACHE_SIZE} = require('../utils/constants').default
-var extend = require('../utils/extend').default
+import { useState, useEffect } from 'react'
+import HNService from '../services/HNService'
+import { UPDATES_CACHE_SIZE } from '../utils/constants'
+import extend from '../utils/extend'
 
 /**
  * Firebase reference used to stream updates.
@@ -97,7 +95,7 @@ function handleUpdateItems(items) {
   UpdatesStore.emit('updates', updates)
 }
 
-var UpdatesStore = extend(new EventEmitter(), {
+const UpdatesStore = extend(new EventEmitter(), {
   loadSession() {
     var json = window.sessionStorage.updates
     updatesCache = (json ? JSON.parse(json) : {comments: {}, stories: {}})
@@ -140,4 +138,56 @@ var UpdatesStore = extend(new EventEmitter(), {
 })
 UpdatesStore.off = UpdatesStore.removeListener
 
-export default UpdatesStore
+export default function UpdatesStore() {
+  const [updates, setUpdates] = useState({ comments: [], stories: [] });
+
+  useEffect(() => {
+    function loadSession() {
+      var json = window.sessionStorage.updates
+      updatesCache = json ? JSON.parse(json) : { comments: {}, stories: {} }
+      populateUpdates()
+    }
+    function saveSession() {
+      window.sessionStorage.updates = JSON.stringify(updatesCache)
+    }
+    function start() {
+      if (updatesRef === null) {
+        updatesRef = HNService.updatesRef()
+        updatesRef.on('value', function(snapshot) {
+          HNService.fetchItems(snapshot.val(), handleUpdateItems)
+        })
+      }
+    }
+    function stop() {
+      updatesRef.off()
+      updatesRef = null
+    }
+    function getUpdates() {
+      return updates
+    }
+    function getItem(id) {
+      return updatesCache.comments[id] || updatesCache.stories[id] || null
+    }
+    function getComment(id) {
+      return updatesCache.comments[id] || null
+    }
+    function getStory(id) {
+      return updatesCache.stories[id] || null
+    }
+
+    return () => {
+      stop()
+    }
+  }, [])
+
+  return {
+    loadSession,
+    saveSession,
+    start,
+    stop,
+    getUpdates,
+    getItem,
+    getComment,
+    getStory
+  }
+}

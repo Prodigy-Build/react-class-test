@@ -1,22 +1,26 @@
-import {hashHistory} from 'react-router'
+import React from 'react';
+import { render } from 'react-dom';
+import { Router } from 'react-router';
+import { useHistory } from 'react-router-dom';
 
-require('./style.css')
+import './style.css';
 
-require('setimmediate')
+import 'setimmediate';
 
-var React = require('react')
-var {render} = require('react-dom')
-var Router = require('react-router/lib/Router')
-var useScroll = require('react-router-scroll/lib/useScroll')
-var applyRouterMiddleware = require('react-router/lib/applyRouterMiddleware')
+import routes from './routes';
 
-var routes = require('./routes').default
+const App = () => {
+  const history = useHistory();
+
+  return (
+    <Router
+      history={history}
+      routes={routes}
+    />
+  );
+}
 
 render(
-  <Router
-    history={hashHistory}
-    render={applyRouterMiddleware(useScroll())}
-    routes={routes}
-  />,
+  <App />,
   document.getElementById('app')
-)
+);

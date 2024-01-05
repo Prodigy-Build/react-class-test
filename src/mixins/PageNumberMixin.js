@@ -1,10 +1,10 @@
-var PageNumberMixin = {
+const PageNumberMixin = {
   getPageNumber(page) {
-    if (typeof page == 'undefined') {
-      page = this.props.location.query.page
+    if (typeof page === 'undefined') {
+      page = this.props.location.query.page;
     }
-    return (page && /^\d+$/.test(page) ? Math.max(1, Number(page)) : 1)
+    return (page && /^\d+$/.test(page) ? Math.max(1, Number(page)) : 1);
   }
-}
+};
 
-export default PageNumberMixin
+export default PageNumberMixin;

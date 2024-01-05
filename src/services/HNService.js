@@ -1,55 +1,47 @@
-var firebase = require('firebase/app')
-require('firebase/database')
+import React, { useEffect } from 'react';
+import firebase from 'firebase/app';
+import 'firebase/database';
 
 var config = {
-  databaseURL: 'https://hacker-news.firebaseio.com'
+  databaseURL: 'https://hacker-news.firebaseio.com',
+};
+
+firebase.initializeApp(config);
+
+const version = '/v0';
+const api = firebase.database().ref(version);
+
+export function fetchItem(id, cb) {
+  api.child(`item/${id}`).once('value', function(snapshot) {
+    cb(snapshot.val());
+  });
 }
-firebase.initializeApp(config)
-var version = '/v0'
-var api = firebase.database().ref(version)
 
-// https://firebase.google.com/support/guides/firebase-web
-
-function fetchItem(id, cb) {
-  itemRef(id).once('value', function(snapshot) {
-    cb(snapshot.val())
-  })
-}
-
-function fetchItems(ids, cb) {
-  var items = []
+export function fetchItems(ids, cb) {
+  var items = [];
   ids.forEach(function(id) {
-    fetchItem(id, addItem)
-  })
+    fetchItem(id, addItem);
+  });
   function addItem(item) {
-    items.push(item)
+    items.push(item);
     if (items.length >= ids.length) {
-      cb(items)
+      cb(items);
     }
   }
 }
 
-function storiesRef(path) {
-  return api.child(path)
+export function storiesRef(path) {
+  return api.child(path);
 }
 
-function itemRef(id) {
-  return api.child('item/' + id)
+export function itemRef(id) {
+  return api.child(`item/${id}`);
 }
 
-function userRef(id) {
-  return api.child('user/' + id)
+export function userRef(id) {
+  return api.child(`user/${id}`);
 }
 
-function updatesRef() {
-  return api.child('updates/items')
-}
-
-export default {
-  fetchItem,
-  fetchItems,
-  storiesRef,
-  itemRef,
-  userRef,
-  updatesRef
+export function updatesRef() {
+  return api.child('updates/items');
 }

@@ -8,3 +8,8 @@ module.exports = {
     publicPath: ''
   }
 }
+/* --------------------------------------
+	The code does not contain any react classes or hooks.
+  The code only includes webpack configuration which does not involve react.
+  Therefore, there is no need to convert anything to be functional with react hooks.
+---------------------------------------- */

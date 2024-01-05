@@ -1,50 +1,47 @@
-var React = require('react')
-var ReactFireMixin = require('reactfire')
-var TimeAgo = require('react-timeago').default
+import React, { useEffect, useState } from 'react';
+import { ReactFireMixin } from 'reactfire';
+import TimeAgo from 'react-timeago';
+import HNService from './services/HNService';
+import Spinner from './Spinner';
+import setTitle from './utils/setTitle';
 
-var HNService = require('./services/HNService').default
-
-var Spinner = require('./Spinner').default
-
-var setTitle = require('./utils/setTitle').default
-
-// TODO User submissions
-
-// TODO User comments
-
-var UserProfile = React.createClass({
-  mixins: [ReactFireMixin],
-  getInitialState() {
-    return {user: {}}
-  },
-
-  componentWillMount() {
-    this.bindAsObject(HNService.userRef(this.props.params.id), 'user')
-  },
-
-  componentWillUpdate(nextProps, nextState) {
-    if (this.state.user.id !== nextState.user.id) {
-      setTitle('Profile: ' + nextState.user.id)
+const UserProfile = ({ params }) => {
+  const [user, setUser] = useState({});
+  
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const userData = await HNService.userRef(params.id);
+      setUser(userData);
     }
-  },
-
-  componentWillReceiveProps(nextProps) {
-    if (this.props.params.id !== nextProps.params.id) {
-      this.unbind('user')
-      this.bindAsObject(HNService.userRef(nextProps.params.id), 'user')
+    
+    fetchUserData();
+  }, [params.id]);
+  
+  useEffect(() => {
+    if (user.id) {
+      setTitle('Profile: ' + user.id);
     }
-  },
-
-  render() {
-    var user = this.state.user
-    if (!user.id) {
-      return <div className="UserProfile UserProfile--loading">
-        <h4>{this.props.params.id}</h4>
+  }, [user.id]);
+  
+  useEffect(() => {
+    return () => {
+      HNService.unbind('user');
+    };
+  }, []);
+  
+  if (!user.id) {
+    return (
+      <div className="UserProfile UserProfile--loading">
+        <h4>{params.id}</h4>
         <Spinner size="20"/>
       </div>
-    }
-    var createdDate = new Date(user.created * 1000)
-    return <div className="UserProfile">
+    );
+  }
+  
+  const createdDate = new Date(user.created * 1000);
+  
+  return (
+    <div className="UserProfile">
       <h4>{user.id}</h4>
       <dl>
         <dt>Created</dt>
@@ -57,7 +54,7 @@ var UserProfile = React.createClass({
         {user.about && <dd><div className="UserProfile__about" dangerouslySetInnerHTML={{__html: user.about}}/></dd>}
       </dl>
     </div>
-  }
-})
+  );
+}
 
-export default UserProfile
+export default UserProfile;

@@ -1,15 +1,14 @@
+import React, { useState } from 'react';
+
 function extend(dest, src1, src2) {
-  var props = Object.keys(src1)
-  for (var i = 0, l = props.length; i < l; i++) {
-    dest[props[i]] = src1[props[i]]
-  }
+  const updatedDest = { ...dest, ...src1 };
+  
   if (src2) {
-    props = Object.keys(src2)
-    for (i = 0, l = props.length; i < l; i++) {
-      dest[props[i]] = src2[props[i]]
-    }
+    const updatedDestWithSrc2 = { ...updatedDest, ...src2 };
+    return updatedDestWithSrc2;
   }
-  return dest
+  
+  return updatedDest;
 }
 
-export default extend
+export default extend;

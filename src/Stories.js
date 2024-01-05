@@ -1,122 +1,120 @@
-var React = require('react')
+import React, { useState, useEffect } from 'react';
+import StoryStore from './stores/StoryStore';
+import PageNumberMixin from './mixins/PageNumberMixin';
+import Paginator from './Paginator';
+import Spinner from './Spinner';
+import StoryListItem from './StoryListItem';
+import SettingsStore from './stores/SettingsStore';
+import { ITEMS_PER_PAGE } from './utils/constants';
+import pageCalc from './utils/pageCalc';
+import setTitle from './utils/setTitle';
 
-var StoryStore = require('./stores/StoryStore').default
+const Stories = (props) => {
+  const [ids, setIds] = useState(null);
+  const [limit, setLimit] = useState(props.limit);
+  const [stories, setStories] = useState([]);
 
-var PageNumberMixin = require('./mixins/PageNumberMixin').default
-var Paginator = require('./Paginator').default
-var Spinner = require('./Spinner').default
-var StoryListItem = require('./StoryListItem').default
-var SettingsStore = require('./stores/SettingsStore').default
+  useEffect(() => {
+    setTitle(props.title);
+    const store = new StoryStore(props.type);
 
-var {ITEMS_PER_PAGE} = require('./utils/constants').default
-var pageCalc = require('./utils/pageCalc').default
-var setTitle = require('./utils/setTitle').default
-
-var Stories = React.createClass({
-  mixins: [PageNumberMixin],
-
-  propTypes: {
-    // The number of stories which may be paginated through
-    limit: React.PropTypes.number.isRequired,
-    // The route name being used
-    route: React.PropTypes.string.isRequired,
-    // The type of stories to be displayed
-    type: React.PropTypes.string.isRequired,
-
-    // Page title associated with the stories being displayed
-    title: React.PropTypes.string
-  },
-
-  getInitialState() {
-    return {
-      ids: null,
-      limit: this.props.limit,
-      stories: []
-    }
-  },
-
-  componentDidMount() {
-    setTitle(this.props.title)
-    this.store = new StoryStore(this.props.type)
-    this.store.addListener('update', this.handleUpdate)
-    this.store.start()
-    this.setState(this.store.getState())
-  },
-
-  componentWillUnmount() {
-    this.store.removeListener('update', this.handleUpdate)
-    this.store.stop()
-    this.store = null
-  },
-
-  handleUpdate(update) {
-    if (!this.isMounted()) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(
-          `Skipping update as the ${this.props.type} Stories component is no longer mounted.`
-        )
+    const handleUpdate = (update) => {
+      if (!document.getElementById('root')) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `Skipping update as the ${props.type} Stories component is no longer mounted.`
+          );
+        }
+        return;
       }
-      return
-    }
-    update.limit = update.ids.length
-    this.setState(update)
-  },
+      update.limit = update.ids.length;
+      setIds(ids);
+    };
 
-  render() {
-    var page = pageCalc(this.getPageNumber(), ITEMS_PER_PAGE, this.state.limit)
+    store.addListener('update', handleUpdate);
+    store.start();
+    setIds(store.getState());
 
-    // Special case for the Read Stories page, as its ids are read from
-    // localStorage and there might not be any yet.
-    if (this.props.type === 'read') {
-      if (this.state.ids == null) {
-        return <div className="Items"></div>
+    return () => {
+      store.removeListener('update', handleUpdate);
+      store.stop();
+    };
+  }, [props.type, props.title, props.limit]);
+
+  const getPageNumber = () => {
+    const url = window.location.href;
+    const match = url.match(/page=(\d+)/);
+    return match ? parseInt(match[1], 10) : 1;
+  };
+
+  const renderItems = (startIndex, endIndex) => {
+    const rendered = [];
+    for (let i = startIndex; i < endIndex; i++) {
+      const item = stories[i];
+      const id = ids[i];
+      if (id) {
+        rendered.push(<StoryListItem key={id} id={id} index={i} cachedItem={item} store={store} />);
+      } else {
+        rendered.push(<StoryListItem key={i} cachedItem={item} store={store} />);
       }
-      if (this.state.ids.length === 0) {
-        return <div className="Items">
+    }
+    return rendered;
+  };
+
+  const page = pageCalc(getPageNumber(), ITEMS_PER_PAGE, limit);
+
+  if (props.type === 'read') {
+    if (ids == null) {
+      return <div className="Items"></div>;
+    }
+    if (ids.length === 0) {
+      return (
+        <div className="Items">
           <p>There are no previously read stories to display.</p>
         </div>
-      }
+      );
     }
-
-    // Display a list of placeholder items while we're waiting for the initial
-    // list of story ids to load from Firebase.
-    if (this.state.ids == null) {
-      var dummyItems = []
-      for (var i = page.startIndex; i < page.endIndex; i++) {
-        dummyItems.push(
-          <li key={i} className="ListItem ListItem--loading" style={{marginBottom: SettingsStore.listSpacing}}>
-            <Spinner/>
-          </li>
-        )
-      }
-      return <div className="Items Items--loading">
-        <ol className="Items__list" start={page.startIndex + 1}>{dummyItems}</ol>
-        <Paginator route={this.props.route} page={page.pageNum} hasNext={page.hasNext}/>
-      </div>
-    }
-
-    return <div className="Items">
-      <ol className="Items__list" start={page.startIndex + 1}>
-        {this.renderItems(page.startIndex, page.endIndex)}
-      </ol>
-      <Paginator route={this.props.route} page={page.pageNum} hasNext={page.hasNext}/>
-    </div>
-  },
-
-  renderItems(startIndex, endIndex) {
-    var rendered = []
-    for (var i = startIndex; i < endIndex; i++) {
-      var item = this.state.stories[i]
-      var id = this.state.ids[i]
-      if (id) {
-        rendered.push(<StoryListItem key={id} id={id} index={i} cachedItem={item} store={this.store}/>)
-      }
-      else {
-        rendered.push(<StoryListItem key={i} cachedItem={item} store={this.store}/>)
-      }
-    }
-    return rendered
   }
-})
 
-export default Stories
+  if (ids == null) {
+    const dummyItems = [];
+    for (let i = page.startIndex; i < page.endIndex; i++) {
+      dummyItems.push(
+        <li
+          key={i}
+          className="ListItem ListItem--loading"
+          style={{ marginBottom: SettingsStore.listSpacing }}
+        >
+          <Spinner />
+        </li>
+      );
+    }
+    return (
+      <div className="Items Items--loading">
+        <ol className="Items__list" start={page.startIndex + 1}>
+          {dummyItems}
+        </ol>
+        <Paginator
+          route={props.route}
+          page={page.pageNum}
+          hasNext={page.hasNext}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="Items">
+      <ol className="Items__list" start={page.startIndex + 1}>
+        {renderItems(page.startIndex, page.endIndex)}
+      </ol>
+      <Paginator
+        route={props.route}
+        page={page.pageNum}
+        hasNext={page.hasNext}
+      />
+    </div>
+  );
+};
+
+export default Stories;
