@@ -1,9 +1,7 @@
-var React = require('react')
+import React from 'react';
 
-var NotFound = React.createClass({
-  render() {
-    return <h2>Not found</h2>
-  }
-})
+const NotFound = () => {
+  return <h2>Not found</h2>;
+};
 
-export default NotFound
+export default NotFound;

@@ -1,71 +1,83 @@
-var React = require('react')
-var Link = require('react-router/lib/Link')
-var TimeAgo = require('react-timeago').default
+import React from 'react';
+import { Link } from 'react-router-dom';
+import TimeAgo from 'react-timeago';
+import SettingsStore from '../stores/SettingsStore';
+import pluralise from '../utils/pluralise';
+import urlParse from 'url-parse';
 
-var SettingsStore = require('../stores/SettingsStore').default
-var pluralise = require('../utils/pluralise').default
-var urlParse = require('url-parse')
-
-var parseHost = function(url) {
-  var hostname = (urlParse(url, true)).hostname
-  var parts = hostname.split('.').slice(-3)
+const parseHost = (url) => {
+  const hostname = urlParse(url, true).hostname;
+  const parts = hostname.split('.').slice(-3);
   if (parts[0] === 'www') {
-    parts.shift()
+    parts.shift();
   }
-  return parts.join('.')
-}
+  return parts.join('.');
+};
 
 /**
  * Reusable logic for displaying an item.
  */
-var ItemMixin = {
+const ItemMixin = {
   /**
    * Render an item's metadata bar.
    */
   renderItemMeta(item, extraContent) {
-    var itemDate = new Date(item.time * 1000)
+    const itemDate = new Date(item.time * 1000);
 
     if (item.type === 'job') {
-      return <div className="Item__meta">
-        <TimeAgo date={itemDate} className="Item__time"/>
-      </div>
+      return (
+        <div className="Item__meta">
+          <TimeAgo date={itemDate} className="Item__time" />
+        </div>
+      );
     }
 
-    return <div className="Item__meta">
-      <span className="Item__score">
-        {item.score} point{pluralise(item.score)}
-      </span>{' '}
-      <span className="Item__by">
-        by <Link to={`/user/${item.by}`}>{item.by}</Link>
-      </span>{' '}
-      <TimeAgo date={itemDate} className="Item__time"/>
-      {' | '}
-      <Link to={`/${item.type}/${item.id}`}>
-        {item.descendants > 0 ? item.descendants + ' comment' + pluralise(item.descendants) : 'discuss'}
-      </Link>
-      {extraContent}
-    </div>
+    return (
+      <div className="Item__meta">
+        <span className="Item__score">
+          {item.score} point{pluralise(item.score)}
+        </span>{' '}
+        <span className="Item__by">
+          by <Link to={`/user/${item.by}`}>{item.by}</Link>
+        </span>{' '}
+        <TimeAgo date={itemDate} className="Item__time" />
+        {' | '}
+        <Link to={`/${item.type}/${item.id}`}>
+          {item.descendants > 0
+            ? item.descendants + ' comment' + pluralise(item.descendants)
+            : 'discuss'}
+        </Link>
+        {extraContent}
+      </div>
+    );
   },
 
   /**
    * Render an item's title bar.
    */
   renderItemTitle(item) {
-    var hasURL = !!item.url
-    var title
+    const hasURL = !!item.url;
+    let title;
     if (item.dead) {
-      title = '[dead] ' + item.title
+      title = '[dead] ' + item.title;
+    } else {
+      title = hasURL ? (
+        <a href={item.url}>{item.title}</a>
+      ) : (
+        <Link to={`/${item.type}/${item.id}`}>{item.title}</Link>
+      );
     }
-    else {
-      title = (hasURL ? <a href={item.url}>{item.title}</a>
-        : <Link to={`/${item.type}/${item.id}`}>{item.title}</Link>)
-    }
-    return <div className="Item__title" style={{fontSize: `${SettingsStore.titleFontSize}px`}}>
-      {title}
-      {hasURL && ' '}
-      {hasURL && <span className="Item__host">({parseHost(item.url)})</span>}
-    </div>
-  }
-}
+    return (
+      <div
+        className="Item__title"
+        style={{ fontSize: `${SettingsStore.titleFontSize}px` }}
+      >
+        {title}
+        {hasURL && ' '}
+        {hasURL && <span className="Item__host">({parseHost(item.url)})</span>}
+      </div>
+    );
+  },
+};
 
-export default ItemMixin
+export default ItemMixin;

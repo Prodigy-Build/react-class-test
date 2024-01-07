@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Creates a className string including some class names conditionally.
  * @param {string=} staticClassName class name(s) which should always be
@@ -8,20 +10,19 @@
  * @return {string}
  */
 function buildClassName(staticClassName, conditionalClassNames) {
-  var classNames = []
-  if (typeof conditionalClassNames == 'undefined') {
-    conditionalClassNames = staticClassName
+  const classNames = [];
+  if (typeof conditionalClassNames === 'undefined') {
+    conditionalClassNames = staticClassName;
+  } else {
+    classNames.push(staticClassName);
   }
-  else {
-    classNames.push(staticClassName)
-  }
-  var classNameKeys = Object.keys(conditionalClassNames)
-  for (var i = 0, l = classNameKeys.length; i < l; i++) {
+  const classNameKeys = Object.keys(conditionalClassNames);
+  for (let i = 0, l = classNameKeys.length; i < l; i++) {
     if (conditionalClassNames[classNameKeys[i]]) {
-      classNames.push(classNameKeys[i])
+      classNames.push(classNameKeys[i]);
     }
   }
-  return classNames.join(' ')
+  return classNames.join(' ');
 }
 
-export default buildClassName
+export default buildClassName;
