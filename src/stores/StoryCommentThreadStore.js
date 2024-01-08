@@ -1,10 +1,10 @@
-var CommentThreadStore = require('./CommentThreadStore').default
-var SettingsStore = require('./SettingsStore').default
-
-var debounce = require('../utils/cancellableDebounce').default
-var extend = require('../utils/extend').default
-var pluralise = require('../utils/pluralise').default
-var storage = require('../utils/storage').default
+import { useState, useEffect } from 'react';
+import CommentThreadStore from './CommentThreadStore';
+import SettingsStore from './SettingsStore';
+import debounce from '../utils/cancellableDebounce';
+import extend from '../utils/extend';
+import pluralise from '../utils/pluralise';
+import storage from '../utils/storage';
 
 /**
  * Load persisted comment thread state.
@@ -13,325 +13,276 @@ var storage = require('../utils/storage').default
  * @return .maxCommentId {Number} 0 if the item hasn't been visited before.
  */
 function loadState(itemId) {
-  var json = storage.get(itemId)
+  var json = storage.get(itemId);
   if (json) {
-    return JSON.parse(json)
+    return JSON.parse(json);
   }
   return {
     lastVisit: null,
     commentCount: 0,
     maxCommentId: 0
-  }
+  };
 }
 
 function StoryCommentThreadStore(item, onCommentsChanged, options) {
-  CommentThreadStore.call(this, item, onCommentsChanged)
-  this.startedLoading = Date.now()
+  const [parents, setParents] = useState({});
+  const [commentCount, setCommentCount] = useState(0);
+  const [newCommentCount, setNewCommentCount] = useState(0);
+  const [maxCommentId, setMaxCommentId] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [expectedComments, setExpectedComments] = useState(item.kids ? item.kids.length : 0);
+  const [itemDescendantCount, setItemDescendantCount] = useState(item.descendants);
+  const [lastVisit, setLastVisit] = useState(null);
+  const [prevMaxCommentId, setPrevMaxCommentId] = useState(0);
+  const [isFirstVisit, setIsFirstVisit] = useState(true);
 
-  /** Lookup from a comment id to its parent comment id. */
-  this.parents = {}
-  /** The number of comments which have loaded. */
-  this.commentCount = 0
-  /** The number of new comments which have loaded. */
-  this.newCommentCount = 0
-  /** The max comment id seen by the store. */
-  this.maxCommentId = 0
-  /** Has the comment thread finished loading? */
-  this.loading = true
-  /** The number of comments we're expecting to load. */
-  this.expectedComments = item.kids ? item.kids.length : 0
-  /**
-   * The number of descendants the story has according to the API.
-   * This count includes deleted comments, which aren't accessible via the API,
-   * so a thread with deleted comments (example story id: 9273709) will never
-   * load this number of comments
-   * However, we still need to persist the last known descendant count in order
-   * to determine how many new comments there are when displaying the story on a
-   * list page.
-   */
-  this.itemDescendantCount = item.descendants
+  useEffect(() => {
+    const initialState = loadState(item.id);
+    setLastVisit(initialState.lastVisit);
+    setPrevMaxCommentId(initialState.maxCommentId);
+    setIsFirstVisit(initialState.lastVisit === null);
 
-  var initialState = loadState(item.id)
-  /** Time of last visit to the story. */
-  this.lastVisit = initialState.lastVisit
-  /** Max comment id on the last visit - determines which comments are new. */
-  this.prevMaxCommentId = initialState.maxCommentId
-  /** Is this the user's first time viewing the story? */
-  this.isFirstVisit = (initialState.lastVisit === null)
+    if (!options.cached) {
+      checkLoadCompletion();
+    }
 
-  // Trigger an immediate check for thread load completion if the item was not
-  // retrieved from the cache, so is the latest version. This completes page
-  // loading immediately for items which have no comments yet.
-  if (!options.cached) {
-    this.checkLoadCompletion()
-  }
-}
+    return () => {
+      numberOfCommentsChanged.cancel();
+      _storeState();
+    };
+  }, []);
 
-StoryCommentThreadStore.loadState = loadState
+  const numberOfCommentsChanged = debounce(() => {
+    onCommentsChanged({ type: 'number' });
+  }, 123);
 
-StoryCommentThreadStore.prototype = extend(Object.create(CommentThreadStore.prototype), {
-  constructor: StoryCommentThreadStore,
+  const firstLoadComplete = () => {
+    setLastVisit(Date.now());
+    setPrevMaxCommentId(maxCommentId);
+    setIsFirstVisit(false);
+    onCommentsChanged({ type: 'first_load_complete' });
+  };
 
-  /**
-   * Callback to the item component with updated comment counts, debounced as
-   * comments will be loading frequently on initial load.
-   */
-  numberOfCommentsChanged: debounce(function() {
-    this.onCommentsChanged({type: 'number'})
-  }, 123),
-
-  /**
-   * If we don't have a last visit time stored for an item, it must have been
-   * visited for the first time. Once it finishes loading, establish the last
-   * visit time and max comment id which will be used to track and display new
-   * comments.
-   */
-  firstLoadComplete() {
-    this.lastVisit = Date.now()
-    this.prevMaxCommentId = this.maxCommentId
-    this.isFirstVisit = false
-    this.onCommentsChanged({type: 'first_load_complete'})
-  },
-
-  /**
-   * Check whether the number of comments has reached the expected number yet.
-   */
-  checkLoadCompletion() {
-    if (this.loading && this.commentCount >= this.expectedComments) {
+  const checkLoadCompletion = () => {
+    if (loading && commentCount >= expectedComments) {
       if (process.env.NODE_ENV !== 'production') {
         console.info(
           'Initial load of ' +
-           this.commentCount + ' comment' + pluralise(this.commentCount) +
-          ' for ' + this.itemId + ' took ' +
-          ((Date.now() - this.startedLoading) / 1000).toFixed(2) + 's'
-        )
+          commentCount + ' comment' + pluralise(commentCount) +
+          ' for ' + item.id + ' took ' +
+          ((Date.now() - startedLoading) / 1000).toFixed(2) + 's'
+        );
       }
-      this.loading = false
-      if (this.isFirstVisit) {
-        this.firstLoadComplete()
+      setLoading(false);
+      if (isFirstVisit) {
+        firstLoadComplete();
       }
-      else if (SettingsStore.autoCollapse && this.newCommentCount > 0) {
-        this.collapseThreadsWithoutNewComments()
+      else if (SettingsStore.autoCollapse && newCommentCount > 0) {
+        collapseThreadsWithoutNewComments();
       }
-      this._storeState()
+      _storeState();
     }
-  },
+  };
 
-  /**
-   * Persist comment thread state.
-   */
-  _storeState() {
-    storage.set(this.itemId, JSON.stringify({
+  const _storeState = () => {
+    storage.set(item.id, JSON.stringify({
       lastVisit: Date.now(),
-      commentCount: this.itemDescendantCount,
-      maxCommentId: this.maxCommentId
-    }))
-  },
+      commentCount: itemDescendantCount,
+      maxCommentId: maxCommentId
+    }));
+  };
 
-  /**
-   * The item this comment thread belongs to got updated.
-   */
-  itemUpdated(item) {
-    this.itemDescendantCount = item.descendants
-  },
+  const itemUpdated = (item) => {
+    setItemDescendantCount(item.descendants);
+  };
 
-  /**
-   * A comment got loaded initially or added later.
-   */
-  commentAdded(comment) {
-    // Deleted comments don't count towards the comment count
+  const commentAdded = (comment) => {
     if (comment.deleted) {
-      // Adjust the number of comments expected during the initial page load.
-      if (this.loading) {
-        this.expectedComments--
-        this.checkLoadCompletion()
+      if (loading) {
+        setExpectedComments(expectedComments - 1);
+        checkLoadCompletion();
       }
-      return
+      return;
     }
 
-    CommentThreadStore.prototype.commentAdded.call(this, comment)
+    CommentThreadStore.prototype.commentAdded.call(this, comment);
 
-    // Dead comments don't contribute to the comment count if showDead is off
     if (comment.dead && !SettingsStore.showDead) {
-      this.expectedComments--
+      setExpectedComments(expectedComments - 1);
     }
     else {
-      this.commentCount++
-    }
-    // Add the number of kids the comment has to the expected total for the
-    // initial load.
-    if (this.loading && comment.kids) {
-      this.expectedComments += comment.kids.length
-    }
-    // Register the comment as new if it's new, unless it's dead and showDead is off
-    if (this.prevMaxCommentId > 0 &&
-        comment.id > this.prevMaxCommentId &&
-        (!comment.dead || SettingsStore.showDead)) {
-      this.newCommentCount++
-      this.isNew[comment.id] = true
-    }
-    // Keep track of the biggest comment id seen
-    if (comment.id > this.maxCommentId) {
-      this.maxCommentId = comment.id
-    }
-    // We don't want the story to be part of the comment parent hierarchy
-    if (comment.parent !== this.itemId) {
-      this.parents[comment.id] = comment.parent
+      setCommentCount(commentCount + 1);
     }
 
-    this.numberOfCommentsChanged()
-    if (this.loading) {
-      this.checkLoadCompletion()
+    if (loading && comment.kids) {
+      setExpectedComments(expectedComments + comment.kids.length);
     }
-  },
 
-  /**
-   * A comment which hasn't loaded yet is being delayed.
-   */
-  commentDelayed(commentId) {
-    // Don't wait for delayed comments
-    this.expectedComments--
-  },
-
-  /**
-   * A comment which wasn't previously deleted became deleted.
-   */
-  commentDeleted(comment) {
-    CommentThreadStore.prototype.commentDeleted.call(this, comment)
-    this.commentCount--
-    if (this.isNew[comment.id]) {
-      this.newCommentCount--
-      delete this.isNew[comment.id]
+    if (
+      prevMaxCommentId > 0 &&
+      comment.id > prevMaxCommentId &&
+      (!comment.dead || SettingsStore.showDead)
+    ) {
+      setNewCommentCount(newCommentCount + 1);
+      setIsNew({ ...isNew, [comment.id]: true });
     }
-    delete this.parents[comment.id]
-    // Trigger debounced callbacks
-    this.numberOfCommentsChanged()
-  },
 
-  /**
-   * A comment which wasn't previously dead became dead.
-   */
-  commentDied(comment) {
+    if (comment.id > maxCommentId) {
+      setMaxCommentId(comment.id);
+    }
+
+    if (comment.parent !== item.id) {
+      setParents({ ...parents, [comment.id]: comment.parent });
+    }
+
+    numberOfCommentsChanged();
+    if (loading) {
+      checkLoadCompletion();
+    }
+  };
+
+  const commentDelayed = (commentId) => {
+    setExpectedComments(expectedComments - 1);
+  };
+
+  const commentDeleted = (comment) => {
+    CommentThreadStore.prototype.commentDeleted.call(this, comment);
+    setCommentCount(commentCount - 1);
+
+    if (isNew[comment.id]) {
+      setNewCommentCount(newCommentCount - 1);
+      setIsNew({ ...isNew, [comment.id]: false });
+    }
+
+    setParents({ ...parents, [comment.id]: undefined });
+    numberOfCommentsChanged();
+  };
+
+  const commentDied = (comment) => {
     if (!SettingsStore.showDead) {
-      this.commentCount--
-      if (this.isNew[comment.id]) {
-        this.newCommentCount--
-        delete this.isNew[comment.id]
+      setCommentCount(commentCount - 1);
+
+      if (isNew[comment.id]) {
+        setNewCommentCount(newCommentCount - 1);
+        setIsNew({ ...isNew, [comment.id]: false });
       }
     }
-  },
+  };
 
-  /**
-   * Change the expected number of comments if an update was received during
-   * initial loding and trigger a re-check of loading completion.
-   */
-  adjustExpectedComments(change) {
-    this.expectedComments += change
-    this.checkLoadCompletion()
-  },
+  const adjustExpectedComments = (change) => {
+    setExpectedComments(expectedComments + change);
+    checkLoadCompletion();
+  };
 
-  collapseThreadsWithoutNewComments() {
-    // Create an id lookup for comments which have a new comment as one of their
-    // descendants. New comments themselves are not added to the lookup.
-    var newCommentIds = Object.keys(this.isNew)
-    var hasNewComments = {}
-    for (var i = 0, l = newCommentIds.length; i < l; i++) {
-      var parent = this.parents[newCommentIds[i]]
+  const collapseThreadsWithoutNewComments = () => {
+    const newCommentIds = Object.keys(isNew);
+    const hasNewComments = {};
+    for (let i = 0, l = newCommentIds.length; i < l; i++) {
+      let parent = parents[newCommentIds[i]];
       while (parent) {
-        // Stop when we hit one we've seen before
         if (hasNewComments[parent]) {
-          break
+          break;
         }
-        hasNewComments[parent] = true
-        parent = this.parents[parent]
+        hasNewComments[parent] = true;
+        parent = parents[parent];
       }
     }
 
-    // Walk the tree of comments one level at a time, only walking children to
-    // comments we know have new comment descendants, to find subtrees which
-    // don't have new comments.
-    // Other comments are marked for collapsing unless they are themselves a
-    // new comment (in which case all their replies must be new too).
-    var shouldCollapse = {}
-    var commentIds = this.children[this.itemId]
+    const shouldCollapse = {};
+    let commentIds = children[item.id];
     while (commentIds.length) {
-      var nextCommentIds = []
-      for (i = 0, l = commentIds.length; i < l; i++) {
-        var commentId = commentIds[i]
+      const nextCommentIds = [];
+      for (let i = 0, l = commentIds.length; i < l; i++) {
+        const commentId = commentIds[i];
         if (!hasNewComments[commentId]) {
-          if (!this.isNew[commentId]) {
-            shouldCollapse[commentId] = true
+          if (!isNew[commentId]) {
+            shouldCollapse[commentId] = true;
           }
         }
         else {
-          var childCommentIds = this.children[commentId]
+          const childCommentIds = children[commentId];
           if (childCommentIds.length) {
-            nextCommentIds.push.apply(nextCommentIds, childCommentIds)
+            nextCommentIds.push(...childCommentIds);
           }
         }
       }
-      commentIds = nextCommentIds
+      commentIds = nextCommentIds;
     }
 
-    this.isCollapsed = shouldCollapse
-    this.onCommentsChanged({type: 'collapse'})
-  },
+    setIsCollapsed(shouldCollapse);
+    onCommentsChanged({ type: 'collapse' });
+  };
 
-  getCommentByTimeIndex(timeIndex) {
-    var sortedCommentIds = Object.keys(this.comments).map(id => Number(id))
+  const getCommentByTimeIndex = (timeIndex) => {
+    const sortedCommentIds = Object.keys(comments).map(id => Number(id));
     if (!SettingsStore.showDead) {
-      sortedCommentIds = sortedCommentIds.filter(id => !this.deadComments[id])
+      sortedCommentIds = sortedCommentIds.filter(id => !deadComments[id]);
     }
-    sortedCommentIds.sort()
-    var commentId = sortedCommentIds[timeIndex - 1]
-    return this.comments[commentId]
-  },
+    sortedCommentIds.sort();
+    const commentId = sortedCommentIds[timeIndex - 1];
+    return comments[commentId];
+  };
 
-  highlightNewCommentsSince(showCommentsAfter) {
-    var referenceComment = this.getCommentByTimeIndex(showCommentsAfter)
+  const highlightNewCommentsSince = (showCommentsAfter) => {
+    const referenceComment = getCommentByTimeIndex(showCommentsAfter);
 
-    // Walk the tree of comments and create a new isNew lookup for comments
-    // newer than the reference comment we're using for highlighting.
-    var isNew = {}
-    var commentIds = this.children[this.itemId]
+    const isNew = {};
+    let commentIds = children[item.id];
     while (commentIds.length) {
-      var nextCommentIds = []
-      for (var i = 0, l = commentIds.length; i < l; i++) {
-        var commentId = commentIds[i]
+      const nextCommentIds = [];
+      for (let i = 0, l = commentIds.length; i < l; i++) {
+        const commentId = commentIds[i];
         if (commentId > referenceComment.id) {
-          isNew[commentId] = true
+          isNew[commentId] = true;
         }
-        var childCommentIds = this.children[commentId]
+        const childCommentIds = children[commentId];
         if (childCommentIds.length) {
-          nextCommentIds.push.apply(nextCommentIds, childCommentIds)
+          nextCommentIds.push(...childCommentIds);
         }
       }
-      commentIds = nextCommentIds
+      commentIds = nextCommentIds;
     }
 
-    this.isNew = isNew
-    this.collapseThreadsWithoutNewComments()
-  },
+    setIsNew(isNew);
+    collapseThreadsWithoutNewComments();
+  };
 
-  /**
-   * Merk the thread as read.
-   */
-  markAsRead() {
-    this.lastVisit = Date.now()
-    this.newCommentCount = 0
-    this.prevMaxCommentId = this.maxCommentId
-    this.isNew = {}
-    this._storeState()
-  },
+  const markAsRead = () => {
+    setLastVisit(Date.now());
+    setNewCommentCount(0);
+    setPrevMaxCommentId(maxCommentId);
+    setIsNew({});
+    _storeState();
+  };
 
-  /**
-   * Persist comment thread state and perform any necessary internal cleanup.
-   */
-  dispose() {
-    // Cancel debounced callbacks in case any are pending
-    this.numberOfCommentsChanged.cancel()
-    this._storeState()
-  }
-})
+  return {
+    parents,
+    commentCount,
+    newCommentCount,
+    maxCommentId,
+    loading,
+    expectedComments,
+    itemDescendantCount,
+    lastVisit,
+    prevMaxCommentId,
+    isFirstVisit,
+    numberOfCommentsChanged,
+    firstLoadComplete,
+    checkLoadCompletion,
+    _storeState,
+    itemUpdated,
+    commentAdded,
+    commentDelayed,
+    commentDeleted,
+    commentDied,
+    adjustExpectedComments,
+    collapseThreadsWithoutNewComments,
+    getCommentByTimeIndex,
+    highlightNewCommentsSince,
+    markAsRead,
+  };
+}
 
-export default StoryCommentThreadStore
+StoryCommentThreadStore.loadState = loadState;
+
+export default StoryCommentThreadStore;

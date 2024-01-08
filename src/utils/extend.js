@@ -1,3 +1,5 @@
+import React from 'react';
+
 function extend(dest, src1, src2) {
   var props = Object.keys(src1)
   for (var i = 0, l = props.length; i < l; i++) {
@@ -12,4 +14,4 @@ function extend(dest, src1, src2) {
   return dest
 }
 
-export default extend
+export default extend;

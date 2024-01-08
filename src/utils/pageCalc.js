@@ -1,8 +1,10 @@
+import React from 'react';
+
 function pageCalc(pageNum, pageSize, numItems) {
-  var startIndex = (pageNum - 1) * pageSize
-  var endIndex = Math.min(numItems, startIndex + pageSize)
-  var hasNext = endIndex < numItems - 1
-  return {pageNum, startIndex, endIndex, hasNext}
+  const startIndex = (pageNum - 1) * pageSize;
+  const endIndex = Math.min(numItems, startIndex + pageSize);
+  const hasNext = endIndex < numItems - 1;
+  return {pageNum, startIndex, endIndex, hasNext};
 }
 
-export default pageCalc
+export default pageCalc;
