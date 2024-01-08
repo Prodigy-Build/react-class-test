@@ -1,178 +1,141 @@
-var React = require('react')
-var ReactFireMixin = require('reactfire')
+import React, { useState, useEffect } from 'react';
+import { useFirebase } from 'reactfire';
+import CommentThreadStore from './stores/CommentThreadStore';
+import HNService from './services/HNService';
+import SettingsStore from './stores/SettingsStore';
+import CommentMixin from './mixins/CommentMixin';
+import cx from './utils/buildClassName';
 
-var CommentThreadStore = require('./stores/CommentThreadStore').default
-var HNService = require('./services/HNService').default
-var SettingsStore = require('./stores/SettingsStore').default
+const Comment = ({ id, level, loadingSpinner, threadStore }) => {
+  const [comment, setComment] = useState({});
+  const firebaseRef = useFirebase().database().ref(`comments/${id}`);
 
-var CommentMixin = require('./mixins/CommentMixin').default
-
-var cx = require('./utils/buildClassName').default
-
-/**
- * A comment in a thread.
- */
-var Comment = React.createClass({
-  mixins: [CommentMixin, ReactFireMixin],
-
-  propTypes: {
-    id: React.PropTypes.number.isRequired,
-    level: React.PropTypes.number.isRequired,
-    loadingSpinner: React.PropTypes.bool,
-    threadStore: React.PropTypes.instanceOf(CommentThreadStore).isRequired
-  },
-
-  getDefaultProps() {
-    return {
-      loadingSpinner: false
-    }
-  },
-
-  getInitialState() {
-    return {
-      comment: {}
-    }
-  },
-
-  componentWillMount() {
-    this.bindFirebaseRef()
-  },
-
-  componentWillUnmount() {
-    this.clearDelayTimeout()
-  },
-
-  componentDidUpdate(prevProps, prevState) {
-    // Huge, fast-growing threads like https://news.ycombinator.com/item?id=9784470
-    // seem to break the API - some comments are coming back from Firebase as null.
-    if (!this.state.comment) {
-      this.props.threadStore.adjustExpectedComments(-1)
-      return
-    }
-
-    // On !prevState.comment: a comment which was initially null - see
-    // above - may eventually load when the API catches up.
-    if (!prevState.comment || !prevState.comment.id) {
-      // Register a newly-loaded comment with the thread store
-      if (this.state.comment.id) {
-        // If the comment was delayed, cancel any pending timeout
-        if (prevState.comment && prevState.comment.delayed) {
-          this.clearDelayTimeout()
-        }
-        this.props.threadStore.commentAdded(this.state.comment)
+  useEffect(() => {
+    const handleFirebaseRefCancelled = (e) => {
+      console.error(`Firebase ref for comment ${id} was cancelled: ${e.message}`);
+      firebaseRef.off('value');
+      setTimeout(bindFirebaseRef, 30000);
+      if (comment && !comment.delayed) {
+        setComment(prevComment => ({ ...prevComment, delayed: true }));
       }
-      if (prevState.comment && !prevState.comment.delayed && this.state.comment.delayed) {
-        this.props.threadStore.commentDelayed(this.props.id)
-      }
-    }
-    // The comment was already loaded, look for changes to it
-    else {
-      if (!prevState.comment.deleted && this.state.comment.deleted) {
-        this.props.threadStore.commentDeleted(this.state.comment)
-      }
-      if (!prevState.comment.dead && this.state.comment.dead) {
-        this.props.threadStore.commentDied(this.state.comment)
-      }
-      // If the comment has been updated and the initial set of comments is
-      // still loading, the number of expected comments might need to be
-      // adjusted.
-      else if (prevState.comment !== this.state.comment &&
-               this.props.threadStore.loading) {
-        var kids = (this.state.comment.kids ? this.state.comment.kids.length : 0)
-        var prevKids = (prevState.comment.kids ? prevState.comment.kids.length : 0)
-        this.props.threadStore.adjustExpectedComments(kids - prevKids)
-      }
-    }
-  },
+    };
 
-  bindFirebaseRef() {
-    this.bindAsObject(HNService.itemRef(this.props.id), 'comment', this.handleFirebaseRefCancelled)
-    if (this.timeout) {
-      this.timeout = null
-    }
-  },
+    const bindFirebaseRef = () => {
+      firebaseRef.on('value', snapshot => {
+        const commentData = snapshot.val();
+        setComment(commentData);
+      }, handleFirebaseRefCancelled);
+    };
 
-  /**
-   * This is usually caused by a permissions error loading the comment due to
-   * its author using the delay setting (note: this is conjecture), which is
-   * measured in minutes - try again in 30 seconds.
-   */
-  handleFirebaseRefCancelled(e) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('Firebase ref for comment ' + this.props.id + ' was cancelled: ' + e.message)
-    }
-    this.unbind('comment')
-    this.timeout = setTimeout(this.bindFirebaseRef, 30000)
-    if (this.state.comment && !this.state.comment.delayed) {
-      this.state.comment.delayed = true
-      this.forceUpdate()
-    }
-  },
+    bindFirebaseRef();
 
-  clearDelayTimeout() {
-    if (this.timeout) {
-      clearTimeout(this.timeout)
-      this.timeout = null
-    }
-  },
+    return () => {
+      firebaseRef.off('value');
+      clearTimeout(delayTimeout);
+    };
+  }, [id]);
 
-  toggleCollapse(e) {
-    e.preventDefault()
-    this.props.threadStore.toggleCollapse(this.state.comment.id)
-  },
-
-  render() {
-    var comment = this.state.comment
-    var props = this.props
+  useEffect(() => {
     if (!comment) {
-      return this.renderError(comment, {
-        id: this.props.id,
-        className: 'Comment Comment--error Comment--level' + props.level
-      })
-    }
-    // Render a placeholder while we're waiting for the comment to load
-    if (!comment.id) { return this.renderCommentLoading(comment) }
-    // Don't show dead coments or their children, when configured
-    if (comment.dead && !SettingsStore.showDead) { return null }
-    // Render a link to HN for deleted comments if they're being displayed
-    if (comment.deleted) {
-      if (!SettingsStore.showDeleted) { return null }
-      return this.renderCommentDeleted(comment, {
-        className: 'Comment Comment--deleted Comment--level' + props.level
-      })
+      threadStore.adjustExpectedComments(-1);
+      return;
     }
 
-    var isNew = props.threadStore.isNew[comment.id]
-    var collapsed = !!props.threadStore.isCollapsed[comment.id]
-    var childCounts = (collapsed && props.threadStore.getChildCounts(comment))
-    if (collapsed && isNew) { childCounts.newComments = 0 }
-    var className = cx('Comment Comment--level' + props.level, {
-      'Comment--collapsed': collapsed,
-      'Comment--dead': comment.dead,
-      'Comment--new': isNew
-    })
+    if (!prevState.comment || !prevState.comment.id) {
+      if (comment.id) {
+        if (prevState.comment && prevState.comment.delayed) {
+          clearTimeout(delayTimeout);
+        }
+        threadStore.commentAdded(comment);
+      }
+      if (prevState.comment && !prevState.comment.delayed && comment.delayed) {
+        threadStore.commentDelayed(id);
+      }
+    } else {
+      if (!prevState.comment.deleted && comment.deleted) {
+        threadStore.commentDeleted(comment);
+      }
+      if (!prevState.comment.dead && comment.dead) {
+        threadStore.commentDied(comment);
+      } else if (prevState.comment !== comment && threadStore.loading) {
+        const kids = comment.kids ? comment.kids.length : 0;
+        const prevKids = prevState.comment.kids ? prevState.comment.kids.length : 0;
+        threadStore.adjustExpectedComments(kids - prevKids);
+      }
+    }
+  }, [comment]);
 
-    return <div className={className}>
-      <div className="Comment__content">
-        {this.renderCommentMeta(comment, {
-          collapsible: true,
-          collapsed: collapsed,
-          link: true,
-          childCounts: childCounts
-        })}
-        {this.renderCommentText(comment, {replyLink: true})}
-      </div>
-      {comment.kids && <div className="Comment__kids">
-        {comment.kids.map(function(id) {
-          return <Comment key={id} id={id}
-            level={props.level + 1}
-            loadingSpinner={props.loadingSpinner}
-            threadStore={props.threadStore}
-          />
-        })}
-      </div>}
-    </div>
+  const clearDelayTimeout = () => {
+    clearTimeout(delayTimeout);
+  };
+
+  const toggleCollapse = (e) => {
+    e.preventDefault();
+    threadStore.toggleCollapse(comment.id);
+  };
+
+  if (!comment) {
+    return renderError(comment, {
+      id,
+      className: `Comment Comment--error Comment--level${level}`,
+    });
   }
-})
 
-export default Comment
+  if (!comment.id) {
+    return renderCommentLoading(comment);
+  }
+
+  if (comment.dead && !SettingsStore.showDead) {
+    return null;
+  }
+
+  if (comment.deleted) {
+    if (!SettingsStore.showDeleted) {
+      return null;
+    }
+    return renderCommentDeleted(comment, {
+      className: `Comment Comment--deleted Comment--level${level}`,
+    });
+  }
+
+  const isNew = threadStore.isNew[comment.id];
+  const collapsed = !!threadStore.isCollapsed[comment.id];
+  const childCounts = collapsed && threadStore.getChildCounts(comment);
+  if (collapsed && isNew) {
+    childCounts.newComments = 0;
+  }
+  const className = cx(`Comment Comment--level${level}`, {
+    'Comment--collapsed': collapsed,
+    'Comment--dead': comment.dead,
+    'Comment--new': isNew,
+  });
+
+  return (
+    <div className={className}>
+      <div className="Comment__content">
+        {renderCommentMeta(comment, {
+          collapsible: true,
+          collapsed,
+          link: true,
+          childCounts,
+        })}
+        {renderCommentText(comment, { replyLink: true })}
+      </div>
+      {comment.kids && (
+        <div className="Comment__kids">
+          {comment.kids.map((id) => (
+            <Comment
+              key={id}
+              id={id}
+              level={level + 1}
+              loadingSpinner={loadingSpinner}
+              threadStore={threadStore}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Comment;

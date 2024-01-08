@@ -1,9 +1,9 @@
 export default {
-  get(key, defaultValue) {
-    var value = window.localStorage[key]
-    return (typeof value != 'undefined' ? value : defaultValue)
+  get: (key, defaultValue) => {
+    const value = window.localStorage.getItem(key);
+    return value !== null ? value : defaultValue;
   },
-  set(key, value) {
-    window.localStorage[key] = value
+  set: (key, value) => {
+    window.localStorage.setItem(key, value);
   }
-}
+};
