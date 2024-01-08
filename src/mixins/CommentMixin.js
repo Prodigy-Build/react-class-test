@@ -1,15 +1,12 @@
-var React = require('react')
-var Link = require('react-router/lib/Link')
-var TimeAgo = require('react-timeago').default
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import TimeAgo from 'react-timeago';
+import ItemStore from '../stores/ItemStore';
+import SettingsStore from '../stores/SettingsStore';
+import Spinner from '../Spinner';
+import pluralise from '../utils/pluralise';
 
-var ItemStore = require('../stores/ItemStore').default
-var SettingsStore = require('../stores/SettingsStore').default
-
-var Spinner = require('../Spinner').default
-
-var pluralise = require('../utils/pluralise').default
-
-var CommentMixin = {
+const CommentMixin = {
   fetchAncestors(comment) {
     ItemStore.fetchCommentAncestors(comment, result => {
       if (process.env.NODE_ENV !== 'production') {
@@ -36,39 +33,49 @@ var CommentMixin = {
   },
 
   renderCommentLoading(comment) {
-    return <div className={'Comment Comment--loading Comment--level' + this.props.level}>
-      {(this.props.loadingSpinner || comment.delayed) && <Spinner size="20"/>}
-      {comment.delayed && <div className="Comment__text">
-        Unable to load comment &ndash; this usually indicates the author has configured a delay.
-        Trying again in 30 seconds.
-      </div>}
-    </div>
+    return (
+      <div className={'Comment Comment--loading Comment--level' + this.props.level}>
+        {(this.props.loadingSpinner || comment.delayed) && <Spinner size="20" />}
+        {comment.delayed && (
+          <div className="Comment__text">
+            Unable to load comment &ndash; this usually indicates the author has configured a delay.
+            Trying again in 30 seconds.
+          </div>
+        )}
+      </div>
+    );
   },
 
   renderCommentDeleted(comment, options) {
-    return <div className={options.className}>
-      <div className="Comment__content">
-        <div className="Comment__meta">
-          [deleted] | <a href={'https://news.ycombinator.com/item?id=' + comment.id}>view on Hacker News</a>
+    return (
+      <div className={options.className}>
+        <div className="Comment__content">
+          <div className="Comment__meta">
+            [deleted] | <a href={'https://news.ycombinator.com/item?id=' + comment.id}>view on Hacker News</a>
+          </div>
         </div>
       </div>
-    </div>
+    );
   },
 
   renderError(comment, options) {
-    return <div className={options.className}>
-      <div className="Comment__content">
-        <div className="Comment__meta">
-          [error] | comment is {JSON.stringify(comment)} | <a href={'https://news.ycombinator.com/item?id=' + options.id}>view on Hacker News</a>
+    return (
+      <div className={options.className}>
+        <div className="Comment__content">
+          <div className="Comment__meta">
+            [error] | comment is {JSON.stringify(comment)} | <a href={'https://news.ycombinator.com/item?id=' + options.id}>view on Hacker News</a>
+          </div>
         </div>
       </div>
-    </div>
+    );
   },
 
   renderCollapseControl(collapsed) {
-    return <span className="Comment__collapse" onClick={this.toggleCollapse} onKeyPress={this.toggleCollapse} tabIndex="0">
-      [{collapsed ? '+' : '–'}]
-    </span>
+    return (
+      <span className="Comment__collapse" onClick={this.toggleCollapse} onKeyPress={this.toggleCollapse} tabIndex="0">
+        [{collapsed ? '+' : '–'}]
+      </span>
+    );
   },
 
   /**
@@ -80,45 +87,57 @@ var CommentMixin = {
    * @param options.childCounts {Object} with .children and .newComments
    */
   renderCommentMeta(comment, options) {
+    const [collapsed, setCollapsed] = useState(options.collapsed);
+
+    const toggleCollapse = () => {
+      setCollapsed(!collapsed);
+    };
+
     if (comment.dead && !SettingsStore.showDead) {
-      return <div className="Comment__meta">
-        {options.collapsible && this.renderCollapseControl(options.collapsed)}
+      return (
+        <div className="Comment__meta">
+          {options.collapsible && this.renderCollapseControl(collapsed)}
+          {options.collapsible && ' '}
+          [dead]
+          {options.childCounts && ' | (' + options.childCounts.children + ' child' + pluralise(options.childCounts.children, ',ren')}
+          {options.childCounts && options.childCounts.newComments > 0 && ', '}
+          {options.childCounts && options.childCounts.newComments > 0 && <em>{options.childCounts.newComments} new</em>}
+          {options.childCounts && ')'}
+        </div>
+      );
+    }
+
+    return (
+      <div className="Comment__meta">
+        {options.collapsible && this.renderCollapseControl(collapsed)}
         {options.collapsible && ' '}
-        [dead]
+        <Link to={`/user/${comment.by}`} className="Comment__user">{comment.by}</Link>{' '}
+        <TimeAgo date={comment.time * 1000} />
+        {options.link && ' | '}
+        {options.link && <Link to={`/comment/${comment.id}`}>link</Link>}
+        {options.parent && ' | '}
+        {options.parent && <Link to={`/${this.state.parent.type}/${comment.parent}`}>parent</Link>}
+        {options.op && ' | on: '}
+        {options.op && <Link to={`/${this.state.op.type}/${this.state.op.id}`}>{this.state.op.title}</Link>}
+        {comment.dead && ' | [dead]'}
         {options.childCounts && ' | (' + options.childCounts.children + ' child' + pluralise(options.childCounts.children, ',ren')}
         {options.childCounts && options.childCounts.newComments > 0 && ', '}
         {options.childCounts && options.childCounts.newComments > 0 && <em>{options.childCounts.newComments} new</em>}
         {options.childCounts && ')'}
       </div>
-    }
-
-    return <div className="Comment__meta">
-      {options.collapsible && this.renderCollapseControl(options.collapsed)}
-      {options.collapsible && ' '}
-      <Link to={`/user/${comment.by}`} className="Comment__user">{comment.by}</Link>{' '}
-      <TimeAgo date={comment.time * 1000}/>
-      {options.link && ' | '}
-      {options.link && <Link to={`/comment/${comment.id}`}>link</Link>}
-      {options.parent && ' | '}
-      {options.parent && <Link to={`/${this.state.parent.type}/${comment.parent}`}>parent</Link>}
-      {options.op && ' | on: '}
-      {options.op && <Link to={`/${this.state.op.type}/${this.state.op.id}`}>{this.state.op.title}</Link>}
-      {comment.dead && ' | [dead]'}
-      {options.childCounts && ' | (' + options.childCounts.children + ' child' + pluralise(options.childCounts.children, ',ren')}
-      {options.childCounts && options.childCounts.newComments > 0 && ', '}
-      {options.childCounts && options.childCounts.newComments > 0 && <em>{options.childCounts.newComments} new</em>}
-      {options.childCounts && ')'}
-    </div>
+    );
   },
 
   renderCommentText(comment, options) {
-    return <div className="Comment__text">
-      {(!comment.dead || SettingsStore.showDead) ? <div dangerouslySetInnerHTML={{__html: comment.text}}/> : '[dead]'}
-      {SettingsStore.replyLinks && options.replyLink && !comment.dead && <p>
-        <a href={`https://news.ycombinator.com/reply?id=${comment.id}`}>reply</a>
-      </p>}
-    </div>
+    return (
+      <div className="Comment__text">
+        {(!comment.dead || SettingsStore.showDead) ? <div dangerouslySetInnerHTML={{__html: comment.text}}/> : '[dead]'}
+        {SettingsStore.replyLinks && options.replyLink && !comment.dead && <p>
+          <a href={`https://news.ycombinator.com/reply?id=${comment.id}`}>reply</a>
+        </p>}
+      </div>
+    );
   }
-}
+};
 
-export default CommentMixin
+export default CommentMixin;
