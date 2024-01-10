@@ -1,49 +1,48 @@
-var firebase = require('firebase/app')
-require('firebase/database')
+import firebase from 'firebase/app';
+import 'firebase/database';
 
-var config = {
+const config = {
   databaseURL: 'https://hacker-news.firebaseio.com'
-}
-firebase.initializeApp(config)
-var version = '/v0'
-var api = firebase.database().ref(version)
+};
+firebase.initializeApp(config);
+const version = '/v0';
+const api = firebase.database().ref(version);
 
-// https://firebase.google.com/support/guides/firebase-web
+const fetchItem = (id, cb) => {
+  itemRef(id).once('value', snapshot => {
+    cb(snapshot.val());
+  });
+};
 
-function fetchItem(id, cb) {
-  itemRef(id).once('value', function(snapshot) {
-    cb(snapshot.val())
-  })
-}
+const fetchItems = (ids, cb) => {
+  const items = [];
+  ids.forEach(id => {
+    fetchItem(id, addItem);
+  });
 
-function fetchItems(ids, cb) {
-  var items = []
-  ids.forEach(function(id) {
-    fetchItem(id, addItem)
-  })
   function addItem(item) {
-    items.push(item)
+    items.push(item);
     if (items.length >= ids.length) {
-      cb(items)
+      cb(items);
     }
   }
-}
+};
 
-function storiesRef(path) {
-  return api.child(path)
-}
+const storiesRef = path => {
+  return api.child(path);
+};
 
-function itemRef(id) {
-  return api.child('item/' + id)
-}
+const itemRef = id => {
+  return api.child('item/' + id);
+};
 
-function userRef(id) {
-  return api.child('user/' + id)
-}
+const userRef = id => {
+  return api.child('user/' + id);
+};
 
-function updatesRef() {
-  return api.child('updates/items')
-}
+const updatesRef = () => {
+  return api.child('updates/items');
+};
 
 export default {
   fetchItem,
@@ -52,4 +51,4 @@ export default {
   itemRef,
   userRef,
   updatesRef
-}
+};
