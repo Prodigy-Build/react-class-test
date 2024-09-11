@@ -1,35 +1,42 @@
-var React = require('react')
-var ReactFireMixin = require('reactfire')
+import React, { useState, useEffect } from 'react';
+import { useFirebase } from 'reactfire';
+import HNService from './services/HNService';
+import Spinner from './Spinner';
+import pluralise from './utils/pluralise';
 
-var HNService = require('./services/HNService').default
+const PollOption = ({ id }) => {
+  const [pollopt, setPollopt] = useState({});
+  const firebase = useFirebase();
 
-var Spinner = require('./Spinner').default
+  useEffect(() => {
+    const itemRef = HNService.itemRef(id);
+    const unsubscribe = firebase.bindObject(itemRef, {
+      onData: (snapshot) => {
+        setPollopt(snapshot.val());
+      },
+    });
 
-var pluralise = require('./utils/pluralise').default
+    return () => {
+      unsubscribe();
+    };
+  }, [id, firebase]);
 
-var PollOption = React.createClass({
-  mixins: [ReactFireMixin],
-
-  getInitialState() {
-    return {pollopt: {}}
-  },
-
-  componentWillMount() {
-    this.bindAsObject(HNService.itemRef(this.props.id), 'pollopt')
-  },
-
-  render() {
-    var pollopt = this.state.pollopt
-    if (!pollopt.id) { return <div className="PollOption PollOption--loading"><Spinner size="20"/></div> }
-    return <div className="PollOption">
-      <div className="PollOption__text">
-        {pollopt.text}
+  if (!pollopt.id) {
+    return (
+      <div className="PollOption PollOption--loading">
+        <Spinner size="20" />
       </div>
+    );
+  }
+
+  return (
+    <div className="PollOption">
+      <div className="PollOption__text">{pollopt.text}</div>
       <div className="PollOption__score">
         {pollopt.score} point{pluralise(pollopt.score)}
       </div>
     </div>
-  }
-})
+  );
+};
 
-export default PollOption
+export default PollOption;

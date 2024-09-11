@@ -1,23 +1,30 @@
-var React = require('react')
-var Link = require('react-router/lib/Link')
+import React from 'react';
+import { Link } from 'react-router-dom';
 
-var Paginator = React.createClass({
-  _onClick(e) {
-    setTimeout(function() { window.scrollTo(0, 0) }, 0)
-  },
+const Paginator = ({ page, hasNext, route }) => {
+  const _onClick = () => {
+    setTimeout(() => { window.scrollTo(0, 0) }, 0);
+  };
 
-  render() {
-    if (this.props.page === 1 && !this.props.hasNext) { return null }
-    return <div className="Paginator">
-      {this.props.page > 1 && <span className="Paginator__prev">
-        <Link to={{pathname: `/${this.props.route}`, query: {page: this.props.page - 1}}} onClick={this._onClick}>Prev</Link>
-      </span>}
-      {this.props.page > 1 && this.props.hasNext && ' | '}
-      {this.props.hasNext && <span className="Paginator__next">
-        <Link to={{pathname: `/${this.props.route}`, query: {page: this.props.page + 1}}} onClick={this._onClick}>More</Link>
-      </span>}
-    </div>
+  if (page === 1 && !hasNext) {
+    return null;
   }
-})
 
-export default Paginator
+  return (
+    <div className="Paginator">
+      {page > 1 && (
+        <span className="Paginator__prev">
+          <Link to={{ pathname: `/${route}`, query: { page: page - 1 } }} onClick={_onClick}>Prev</Link>
+        </span>
+      )}
+      {page > 1 && hasNext && ' | '}
+      {hasNext && (
+        <span className="Paginator__next">
+          <Link to={{ pathname: `/${route}`, query: { page: page + 1 } }} onClick={_onClick}>More</Link>
+        </span>
+      )}
+    </div>
+  );
+};
+
+export default Paginator;

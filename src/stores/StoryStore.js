@@ -1,151 +1,114 @@
-var {EventEmitter} = require('events')
+import React, { useState, useEffect } from 'react';
+import { EventEmitter } from 'events';
+import HNService from '../services/HNService';
+import extend from '../utils/extend';
 
-var HNService = require('../services/HNService').default
+const ID_REGEXP = /^\d+$/;
 
-var extend = require('../utils/extend').default
+let firebaseRef = null;
 
-var ID_REGEXP = /^\d+$/
+let idCache = {};
+let itemCache = {};
+let storyLists = {};
 
-/**
- * Firebase reference used to stream updates - only one StoryStore instance can
- * be active at a time.
- */
-var firebaseRef = null
-
-// Cache objects shared among StoryStore instances, also accessible via static
-// functions on the StoryStore constructor.
-
-/**
- * Story ids by type, in rank order. Persisted to sessionStorage.
- * @type Object.<type, Array.<id>>
- */
-var idCache = {}
-
-/**
- * Item cache. Persisted to sessionStorage.
- * @type Object.<id, item>
- */
-var itemCache = {}
-
-/**
- * Story items in rank order for display, by type.
- * @type Object.<type, Array.<item>>
- */
-var storyLists = {}
-
-/**
- * Populate the story list for the given story type from the cache.
- */
 function populateStoryList(type) {
-  var ids = idCache[type]
-  var storyList = storyLists[type]
-  for (var i = 0, l = ids.length; i < l; i++) {
-    storyList[i] = itemCache[ids[i]] || null
+  const ids = idCache[type];
+  const storyList = storyLists[type];
+  for (let i = 0, l = ids.length; i < l; i++) {
+    storyList[i] = itemCache[ids[i]] || null;
   }
 }
 
 function parseJSON(json, defaultValue) {
-  return (json ? JSON.parse(json) : defaultValue)
+  return json ? JSON.parse(json) : defaultValue;
 }
 
-class StoryStore extends EventEmitter {
-  constructor(type) {
-    super()
-    this.type = type
+const StoryStore = (type) => {
+  const [ids, setIds] = useState(idCache[type]);
+  const [stories, setStories] = useState(storyLists[type]);
 
-    // Ensure cache objects for this type are initialised
+  const getState = () => {
+    return {
+      ids: idCache[type],
+      stories: storyLists[type]
+    };
+  };
+
+  const itemUpdated = (item, index) => {
+    storyLists[type][index] = item;
+    itemCache[item.id] = item;
+  };
+
+  const onStorage = (e) => {
+    if (itemCache[e.key]) {
+      this.emit(e.key);
+    }
+  };
+
+  const onStoriesUpdated = (snapshot) => {
+    idCache[type] = snapshot.val();
+    populateStoryList(type);
+    this.emit('update', getState());
+  };
+
+  const start = () => {
+    if (type === 'read') {
+      const readStoryIds = Object.keys(window.localStorage)
+        .filter((key) => ID_REGEXP.test(key))
+        .map((id) => Number(id))
+        .sort((a, b) => b - a);
+      setImmediate(() => onStoriesUpdated({ val: () => readStoryIds }));
+    } else {
+      firebaseRef = HNService.storiesRef(type);
+      firebaseRef.on('value', onStoriesUpdated);
+    }
+    window.addEventListener('storage', onStorage);
+  };
+
+  const stop = () => {
+    if (firebaseRef !== null) {
+      firebaseRef.off();
+      firebaseRef = null;
+    }
+    window.removeEventListener('storage', onStorage);
+  };
+
+  useEffect(() => {
     if (!(type in idCache)) {
-      idCache[type] = []
+      idCache[type] = [];
     }
     if (!(type in storyLists)) {
-      storyLists[type] = []
-      populateStoryList(type)
+      storyLists[type] = [];
+      populateStoryList(type);
     }
 
-    // Pre-bind event handlers per instance
-    this.onStorage = this.onStorage.bind(this)
-    this.onStoriesUpdated = this.onStoriesUpdated.bind(this)
-  }
+    start();
 
-  getState() {
-    return {
-      ids: idCache[this.type],
-      stories: storyLists[this.type]
-    }
-  }
+    return () => {
+      stop();
+    };
+  }, []);
 
-  itemUpdated(item, index) {
-    storyLists[this.type][index] = item
-    itemCache[item.id] = item
-  }
+  return {
+    getState,
+    itemUpdated
+  };
+};
 
-  /**
-   * Emit an item id event if a storage key corresponding to an item in the
-   * cache has changed.
-   */
-  onStorage(e) {
-    if (itemCache[e.key]) {
-      this.emit(e.key)
-    }
-  }
-
-  /**
-   * Handle story id snapshots from Firebase.
-   */
-  onStoriesUpdated(snapshot) {
-    idCache[this.type] = snapshot.val()
-    populateStoryList(this.type)
-    this.emit('update', this.getState())
-  }
-
-  start() {
-    if (this.type === 'read') {
-      var readStoryIds = Object.keys(window.localStorage)
-        .filter(key => ID_REGEXP.test(key))
-        .map(id => Number(id))
-        .sort((a, b) => b - a)
-      setImmediate(() => this.onStoriesUpdated({val: () => readStoryIds}))
-    }
-    else {
-      firebaseRef = HNService.storiesRef(this.type)
-      firebaseRef.on('value', this.onStoriesUpdated)
-    }
-    window.addEventListener('storage', this.onStorage)
-  }
-
-  stop() {
-    if (firebaseRef !== null) {
-      firebaseRef.off()
-      firebaseRef = null
-    }
-    window.removeEventListener('storage', this.onStorage)
-  }
-}
-
-// Static, cache-related functions
 extend(StoryStore, {
-  /**
-   * Get an item from the cache.
-   */
   getItem(id) {
-    return itemCache[id] || null
+    return itemCache[id] || null;
   },
 
-  /**
-   * Deserialise caches from sessionStorage.
-   */
   loadSession() {
-    idCache = parseJSON(window.sessionStorage.idCache, {})
-    itemCache = parseJSON(window.sessionStorage.itemCache, {})
+    idCache = parseJSON(window.sessionStorage.idCache, {});
+    itemCache = parseJSON(window.sessionStorage.itemCache, {});
   },
 
-  /**
-   * Serialise caches to sessionStorage as JSON.
-   */
   saveSession() {
-    window.sessionStorage.idCache = JSON.stringify(idCache)
-    window.sessionStorage.itemCache = JSON.stringify(itemCache)
+    window.sessionStorage.idCache = JSON.stringify(idCache);
+    window.sessionStorage.itemCache = JSON.stringify(itemCache);
   }
-})
+});
 
-export default StoryStore
+export default StoryStore;

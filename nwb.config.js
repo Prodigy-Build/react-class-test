@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
   type: 'react-app',
   webpack: {
@@ -7,4 +9,4 @@ module.exports = {
     // Path-independent build which doesn't have to be served at /
     publicPath: ''
   }
-}
+};
